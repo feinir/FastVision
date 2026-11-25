@@ -1433,8 +1433,13 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                         if curItemCount + indexPaths.count >= nowLayoutCalcPos {
                                             if !keepScrollPos {
                                                 let newIndexPaths = indexPaths.dropFirst(curItemCount + indexPaths.count - nowLayoutCalcPos)
-                                                collectionView.insertItems(at: Set(newIndexPaths))
-                                                setProgress(Double(curItemCount+newIndexPaths.count)/Double(count))
+                                                if lastLayoutCalcPosUsed == 0 {
+                                                    // Rebuild the first batch after a folder reset. Later batches only append.
+                                                    reloadThumbnailCollection()
+                                                } else if !newIndexPaths.isEmpty {
+                                                    collectionView.insertItems(at: Set(newIndexPaths))
+                                                }
+                                                setProgress(Double(nowLayoutCalcPos) / Double(count))
                                                 selectItemsNewChanged(isFinal: false, checkRange: indexPaths)
                                             }
                                             

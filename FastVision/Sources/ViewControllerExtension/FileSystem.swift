@@ -777,6 +777,7 @@ extension ViewController {
         fileDB.lock()
         let lastCurFolder = fileDB.curFolder
         fileDB.unlock()
+        let previousThumbnailItems = collectionView.visibleItems()
         
         // 清空任务池
         // Clear task pool
@@ -792,7 +793,7 @@ extension ViewController {
         // Capture interface, or replace opening from finder with opening in directory
         var openedFile: FileModel?
         if publicVar.openFromFinderPath == "" {
-            if (lastCurFolder != path || publicVar.isInLargeView),
+            if publicVar.isInLargeView,
                let snapshot = captureSnapshot(of: coreAreaView) {
                 coreAreaView.addSubview(snapshot)
                 snapshotQueue.append(snapshot)
@@ -877,7 +878,10 @@ extension ViewController {
         }
         fileDB.unlock()
 
-        if lastCurFolder != path { closeSimilarPhotos(restoreFocus: false) }
+        if lastCurFolder != path {
+            closeSimilarPhotos(restoreFocus: false)
+            coreAreaView.hideInfo()
+        }
 
         // 如果是打开文件的情况，则设置标题、加载大图附近的缩略图
         if let openedFile {
@@ -893,24 +897,14 @@ extension ViewController {
             // Deletions can reuse the remaining files' dimensions for a single reload.
             recalcLayout(path)
             publishThumbnailRefresh()
-        } else if needClearThenInsert || preserveScroll {
-            // Commit the empty item count before background metadata loads.
-            collectionView.reloadData()
-            collectionView.numberOfItems(inSection:0)
+        } else {
+            // AppKit may keep the previous cells attached while the item count is zero.
+            for item in previousThumbnailItems {
+                item.view.isHidden = true
+            }
+            // Lay out the empty view before the next folder can publish thumbnails.
+            reloadThumbnailCollection()
         }
-        
-        // 界面快照渐隐动画
-        // Interface snapshot fade-out animation
-//        NSAnimationContext.runAnimationGroup({ context in
-//            context.duration = 0.6
-//            snapshot?.animator().alphaValue = 0
-//            largeImageView.animator().alphaValue = 0
-//            largeImageBgEffectView.animator().alphaValue = 0
-//        }, completionHandler: {
-//            snapshot?.removeFromSuperview()
-//            self.largeImageView.isHidden=true
-//            self.largeImageBgEffectView.isHidden=true
-//        })
         
         if true{
             readInfoTaskPoolLock.lock()
@@ -927,10 +921,6 @@ extension ViewController {
             // 对于空文件夹，播放渐变动画（因为没有分派任务，所以在任务里的渐变调用不到）
             // For empty folders, play fade animation (because no tasks are dispatched, fade in tasks won't be called)
             if keys.isEmpty {
-                
-                collectionView.reloadData()
-                collectionView.numberOfItems(inSection:0)
-
                 setProgress(1.0)
 
                 if !FileManager.default.fileExists(atPath: path.dropLast().replacingOccurrences(of: "file://", with: "").removingPercentEncoding!) {
@@ -960,53 +950,28 @@ extension ViewController {
                 }
             }
             
-            // 对于非空文件夹，延迟播放渐变动画（主要是针对网络驱动器时，可能连第一个对象获取信息都非常耗时，需要在此处也计时）
-            // For non-empty folders, delay fade animation (mainly for network drives, getting info for even the first object can be very time-consuming, need timing here too)
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                Thread.sleep(forTimeInterval: 0.5)
+            // Show a loading message when the first batch takes longer to arrive.
+            if !keys.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self else { return }
 
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    
                     fileDB.lock()
-                    let curFolder=fileDB.curFolder
-                    let layoutCalcPos=fileDB.db[SortKeyDir(curFolder)]?.layoutCalcPos ?? -1
+                    let isCurrentLoad = fileDB.curFolder == path && dirModel.ver == ver
                     fileDB.unlock()
-                    
-                    if ver != dirModel.ver {return}
-                    
-                    if curFolder == path {
-                        
-                        if snapshotQueue.count > 0 {
-                            let curTime = DispatchTime.now()
-                            let nanoTime = curTime.uptimeNanoseconds - startTime.uptimeNanoseconds
-                            let timeInterval = Double(nanoTime) / 1_000_000_000
-                            log("Time taken to reach hidden snapshot reason 2: \(timeInterval) seconds")
-                            log("-----------------------------------------------------------")
-                        }
-                        
-                        while snapshotQueue.count > 0{
-                            
-                            if layoutCalcPos == 0{
-                                coreAreaView.showInfo(NSLocalizedString("Loading...", comment: "加载中..."), timeOut: .infinity, cannotBeCleard: false)
-                            }
-                            
-                            let snapshot=snapshotQueue.first!
-                            snapshotQueue.removeFirst()
-                            // publicVar.isInLargeView=false
-                            NSAnimationContext.runAnimationGroup({ context in
-                                context.duration = 0.2
-                                snapshot?.animator().alphaValue = 0
-                                //                                    self.largeImageView.animator().alphaValue = 0
-                                //                                    self.largeImageBgEffectView.animator().alphaValue = 0
-                            }, completionHandler: {
-                                snapshot?.removeFromSuperview()
-                                //                                    self.largeImageView.isHidden=true
-                                //                                    self.largeImageBgEffectView.isHidden=true
-                                //                                    publicVar.isInLargeViewAfterAnimate=false
-                            })
-                        }
+                    guard isCurrentLoad else { return }
+
+                    if !publicVar.isInLargeView && collectionView.numberOfItems(inSection: 0) == 0 {
+                        coreAreaView.showInfo(NSLocalizedString("Loading...", comment: "加载中..."), timeOut: .infinity, cannotBeCleard: false)
+                    }
+
+                    while !snapshotQueue.isEmpty {
+                        let snapshot = snapshotQueue.removeFirst()
+                        NSAnimationContext.runAnimationGroup({ context in
+                            context.duration = 0.2
+                            snapshot?.animator().alphaValue = 0
+                        }, completionHandler: {
+                            snapshot?.removeFromSuperview()
+                        })
                     }
                 }
             }
@@ -1020,13 +985,16 @@ extension ViewController {
         }
     }
     
-    func publishThumbnailRefresh() {
-        guard let scrollOrigin = pendingThumbnailRefreshScrollOrigin else { return }
-        pendingThumbnailRefreshScrollOrigin = nil
-
+    func reloadThumbnailCollection() {
         collectionView.reloadData()
         collectionView.numberOfItems(inSection: 0)
         mainScrollView.layoutSubtreeIfNeeded()
+    }
+
+    func publishThumbnailRefresh() {
+        guard let scrollOrigin = pendingThumbnailRefreshScrollOrigin else { return }
+        pendingThumbnailRefreshScrollOrigin = nil
+        reloadThumbnailCollection()
 
         let clipView = mainScrollView.contentView
         let bounds = NSRect(origin: scrollOrigin, size: clipView.bounds.size)

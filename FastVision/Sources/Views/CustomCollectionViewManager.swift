@@ -30,6 +30,9 @@ class CustomCollectionViewManager: NSObject, NSCollectionViewDataSource, NSColle
         fileDB.lock()
         if let file=fileDB.db[SortKeyDir(fileDB.curFolder)]?.files.elementSafe(atOffset: indexPath.item)?.1{
             item.configureWithImage(file)
+            item.view.isHidden = false
+        } else {
+            item.view.isHidden = true
         }
         fileDB.unlock()
         
