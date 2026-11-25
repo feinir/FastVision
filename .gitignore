@@ -1,2 +1,6 @@
 xcuserdata/
 LocalDev.xcconfig
+
+.DS_Store
+/outputs/
+/work/

@@ -1,18 +1,18 @@
-
 <p align="center">
-<h1 align="center">FlowVision</h1>
-<h3 align="center">Waterfall-style Image Viewer for macOS<br><br><a href="./README_zh.md">[中文说明]</a></h3> 
+<h1 align="center">FastVision</h1>
+<h3 align="center">A Fast-series waterfall image viewer for macOS<br><br><a href="./README_zh.md">[中文说明]</a></h3>
 </p>
 
-[![](https://img.shields.io/github/release/netdcy/FlowVision.svg?color=blue)](https://github.com/netdcy/FlowVision/releases/latest "GitHub release") [![](https://img.shields.io/github/downloads/netdcy/FlowVision/total?color=blue)](https://github.com/netdcy/FlowVision/releases/latest "GitHub downloads") ![GitHub License](https://img.shields.io/github/license/netdcy/FlowVision?color=blue)
 
 ## Screenshots
 
+These screenshots are from upstream FlowVision.
+
 ### Light Mode
-![preview](https://netdcy.github.io/FlowVision/docs/preview_2.png)
+![preview](./docs/preview_2.png)
 
 ### Dark Mode
-![preview](https://netdcy.github.io/FlowVision/docs/preview_1.png)
+![preview](./docs/preview_1.png)
 
 ## Features:
  - Adaptive layout mode, light/dark mode
@@ -28,24 +28,14 @@
 
 ### System Requirements
 
- - macOS 11.0 or Later
+ - macOS 12.0 or later
 
 ### Privacy and Security
 
  - Open source
  - No Internet connection
 
-### Homebrew Install
-
-Initial Installation
-```
-brew install flowvision
-```
-Upgrade
-```
-brew update
-brew upgrade flowvision
-```
+Follow the build steps below to run a local copy.
 
 ## Instructions:
 ### In Image View:
@@ -67,58 +57,12 @@ brew upgrade flowvision
 
 ## Build
 
-### Environment
+Build the FFmpeg frameworks from [the pinned local sources](./third_party/ffmpeg/README.md). The documented directory layout also applies to the Xcode project. [Application dependency sources](./third_party/app-sources/source-lock.json) are versioned by their upstream commits.
 
-Xcode 15.2+
+## Upstream and license
 
-### Libraries
+FastVision is an independently maintained fork of [netdcy/FlowVision](https://github.com/netdcy/FlowVision). Thanks to netdcy and the FlowVision contributors.
 
- - https://github.com/arthenica/ffmpeg-kit
- - https://github.com/attaswift/BTree
- - https://github.com/sindresorhus/Settings
+On 2026-11-25, FastVision changed the application name, project identifiers, and English and Chinese documentation. See the Git history for changes.
 
-### Steps
-
-1. Clone the source code of the project and libraries.
-2. For ffmpeg-kit, it need to be built to binary first. If you want to save time, you can directly download its pre-built binary, named like `ffmpeg-kit-full-gpl-6.0-macos-xcframework.zip` (not LTS version). Unzip it, then execute this in terminal to remove its quarantine attribute:
-
-    ```
-    sudo xattr -rd com.apple.quarantine ./ffmpeg-kit-full-gpl-6.0-macos-xcframework
-    ```
-    
-    (Due to the project being discontinued and copyright reasons, the prebuilt binaries have been removed. Here is a [backup](https://github.com/netdcy/ffmpeg-kit/releases/download/v6.0/ffmpeg-kit-full-gpl-6.0-macos-xcframework.zip) of original file.)
-
-3. Organize the directory structure as shown below:
-
-    ```
-    ├── FlowVision
-    │   ├── FlowVision.xcodeproj
-    │   └── FlowVision
-    │       └── Sources
-    ├── ffmpeg-kit-build
-    │   └── bundle-apple-xcframework-macos
-    │       ├── ffmpegkit.xcframework
-    │       └── ...
-    ├── BTree
-    │   ├── Package.swift
-    │   └── Sources
-    └── Settings
-        ├── Package.swift
-        └── Sources
-    ```
-
-4. Open `FlowVision.xcodeproj` by Xcode, click 'Product' -> 'Build For' -> 'Profiling' in menu bar.
-5. Then 'Product' -> 'Show Build Folder in Finder', and you will find the app is at `Products/Release/FlowVision.app`.
-
-## Donate
-
-If you found the project is helpful, feel free to buy me a coffee.
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/netdcyn)
-
-<img src="https://flowvision.app/donate.jpg" alt="WeChat Donate" width="350"/>
-
-## License
-
-This project is licensed under the GPL License. See the [LICENSE](https://github.com/netdcy/FlowVision/blob/main/LICENSE) file for the full license text.
-
+FastVision is released under GNU GPL v3. See [LICENSE](./LICENSE) for the full text. Third-party components retain their own licenses.

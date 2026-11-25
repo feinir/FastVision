@@ -1,17 +1,18 @@
 <p align="center">
-<h1 align="center">FlowVision</h1>
-<h3 align="center">为macOS设计的瀑布流式图片浏览器</h3> 
+<h1 align="center">FastVision</h1>
+<h3 align="center">Fast 系列的 macOS 瀑布流图片浏览器</h3>
 </p>
 
-[![](https://img.shields.io/github/release/netdcy/FlowVision.svg?color=blue)](https://github.com/netdcy/FlowVision/releases/latest "GitHub release") [![](https://img.shields.io/github/downloads/netdcy/FlowVision/total?color=blue)](https://github.com/netdcy/FlowVision/releases/latest "GitHub downloads") ![GitHub License](https://img.shields.io/github/license/netdcy/FlowVision?color=blue)
 
 ## 预览
 
+以下截图来自上游 FlowVision。
+
 ### 浅色模式
-![preview](https://netdcy.github.io/FlowVision/docs/preview_2.png)
+![preview](./docs/preview_2.png)
 
 ### 黑暗模式
-![preview](https://netdcy.github.io/FlowVision/docs/preview_1.png)
+![preview](./docs/preview_1.png)
 
 ## 应用特点:
 
@@ -35,24 +36,14 @@
 
 ### 系统需求
 
- - macOS 11.0+
+ - macOS 12.0+
 
 ### 隐私与安全性
 
  - 开源软件
  - 无网络请求
 
-### Homebrew 方式安装
-
-首次安装
-```
-brew install flowvision
-```
-版本升级
-```
-brew update
-brew upgrade flowvision
-```
+当前可按下文的编译步骤构建本地版本。
 
 ## 操作说明
 
@@ -75,57 +66,12 @@ brew upgrade flowvision
 
 ## 编译
 
-### 环境
+按 [FFmpeg 对应源码和构建说明](./third_party/ffmpeg/README.md) 从本地固定源码构建 macOS 双架构框架，然后按说明准备 Xcode 工程所需的同级目录。[应用依赖源码清单](./third_party/app-sources/source-lock.json) 记录了各自的固定提交。
 
-Xcode 15.2+
+## 上游来源与许可
 
-### 第三方库
+FastVision 基于 [netdcy/FlowVision](https://github.com/netdcy/FlowVision)，由 FastVision 项目独立维护。感谢 netdcy 和 FlowVision 的贡献者。
 
- - https://github.com/arthenica/ffmpeg-kit
- - https://github.com/attaswift/BTree
- - https://github.com/sindresorhus/Settings
+2026-11-25，FastVision 修改了应用名称、工程标识和中英文文档。有关改动可在 Git 提交记录中查看。
 
-### 构建步骤
-
-1. 克隆此项目和依赖库的代码。
-2. 对于ffmpeg-kit，需要预先构建二进制文件。如果你想省时间，可以直接下载它已构建好的二进制库，例如 `ffmpeg-kit-full-gpl-6.0-macos-xcframework.zip` (非LTS版本)。 解压后，在终端执行如下命令以移除quarantine属性：
-
-    ```
-    sudo xattr -rd com.apple.quarantine ./ffmpeg-kit-full-gpl-6.0-macos-xcframework
-    ```
-
-    (由于项目中止和版权原因，预构建的二进制文件已被移除，[这里](https://github.com/netdcy/ffmpeg-kit/releases/download/v6.0/ffmpeg-kit-full-gpl-6.0-macos-xcframework.zip)是原文件的备份。)
-
-3. 按如下所示组织目录结构：
-
-    ```
-    ├── FlowVision
-    │   ├── FlowVision.xcodeproj
-    │   └── FlowVision
-    │       └── Sources
-    ├── ffmpeg-kit-build
-    │   └── bundle-apple-xcframework-macos
-    │       ├── ffmpegkit.xcframework
-    │       └── ...
-    ├── BTree
-    │   ├── Package.swift
-    │   └── Sources
-    └── Settings
-        ├── Package.swift
-        └── Sources
-    ```
-
-4. 用Xcode打开 `FlowVision.xcodeproj` ，在菜单栏中点击 'Product' -> 'Build For' -> 'Profiling' 。
-5. 然后 'Product' -> 'Show Build Folder in Finder'，就可以看到构建好的app了 `Products/Release/FlowVision.app` 。
-
-## 支持
-
-如果你感觉这个应用有帮助，欢迎支持开发者！
-
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/netdcyn)
-
-<img src="https://flowvision.app/donate.jpg" alt="WeChat Donate" width="350"/>
-
-## 协议
-
-本项目使用GPL许可证。完整的许可证文本请参见 [LICENSE](https://github.com/netdcy/FlowVision/blob/main/LICENSE) 文件。
+本项目按 GNU GPL v3 发布，许可证全文见 [LICENSE](./LICENSE)。第三方组件适用各自的许可证。

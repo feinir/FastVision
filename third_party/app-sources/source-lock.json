@@ -1,0 +1,44 @@
+[
+  {
+    "name": "BTree",
+    "repository": "https://github.com/attaswift/BTree",
+    "commit": "407fda73e18cc9df9130453ee36f73408c22408f",
+    "archive": "BTree.tar.gz",
+    "sha256": "511074baf5824e2d9f15c1b9dff3ce15eeff76a81394391e3335d6272f8abd9d"
+  },
+  {
+    "name": "Settings",
+    "repository": "https://github.com/sindresorhus/Settings",
+    "commit": "f41475771f65379ca10852c95119a7f53f0de5a5",
+    "archive": "Settings.tar.gz",
+    "sha256": "a6726ceb42de67d4bd86ce3566cc29c4ea9680dfff6ac8a95fc60308fa1fc9ad"
+  },
+  {
+    "name": "SDWebImage",
+    "repository": "https://github.com/SDWebImage/SDWebImage",
+    "commit": "cac9a55a3ae92478a2c95042dcc8d9695d2129ca",
+    "archive": "SDWebImage.tar.gz",
+    "sha256": "9ec3a57245715bb434e77f1b3cd449a77c07bf4475d75829336f4d7c94e52e8a"
+  },
+  {
+    "name": "SDWebImageWebPCoder",
+    "repository": "https://github.com/SDWebImage/SDWebImageWebPCoder",
+    "commit": "f534cfe830a7807ecc3d0332127a502426cfa067",
+    "archive": "SDWebImageWebPCoder.tar.gz",
+    "sha256": "5fe45ae2af1ea005288f9dc29af3db0cbdab13ecf26f076524432fb369abe853"
+  },
+  {
+    "name": "libwebp-Xcode",
+    "repository": "https://github.com/SDWebImage/libwebp-Xcode",
+    "commit": "0d60654eeefd5d7d2bef3835804892c40225e8b2",
+    "archive": "libwebp-Xcode.tar.gz",
+    "sha256": "5508d2789a2ff10b9786c8d3167ee7961503dd4e5a4f9468aebd51117289e306"
+  },
+  {
+    "name": "libwebp-webmproject",
+    "repository": "https://github.com/webmproject/libwebp",
+    "commit": "a4d7a715337ded4451fec90ff8ce79728e04126c",
+    "archive": "libwebp-webmproject.tar.gz",
+    "sha256": "e3a6189054f81e06a5fbadb0d5c5a4678018c6df6d37e17bd99a86f66c650a97"
+  }
+]

@@ -1,0 +1,47 @@
+--- a/scripts/apple/gnutls.sh
++++ b/scripts/apple/gnutls.sh
+@@ -1,15 +1,7 @@
+ #!/bin/bash
+ 
+-# INIT SUBMODULES
+-${SED_INLINE} 's|openssl/openssl|arthenica/openssl|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|tomato42|arthenica|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|warner|arthenica|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|gitlab.com/libidn/gnulib-mirror|github.com/arthenica/gnulib|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|gitlab.com/gnutls/libtasn1|github.com/arthenica/libtasn1|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|gitlab.com/gnutls/nettle|github.com/arthenica/nettle|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|gitlab.com/gnutls/abi-dump|github.com/arthenica/abi-dump|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|gitlab.com/gnutls/cligen|github.com/arthenica/cligen|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-${SED_INLINE} 's|gitlab.com/redhat-crypto/tests/interop|github.com/arthenica/redhat-crypto-tests-interop|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
++# The pinned release tarball includes configure and the generated sources.
++test -x ./configure || return 1
+ 
+ # UPDATE BUILD FLAGS
+ export CFLAGS="$(get_cflags ${LIB_NAME}) -I${SDK_PATH}/usr/include"
+@@ -25,13 +17,6 @@
+ 
+ # ALWAYS CLEAN THE PREVIOUS BUILD
+ make distclean 2>/dev/null 1>/dev/null
+-
+-# REGENERATE BUILD FILES IF NECESSARY OR REQUESTED
+-if [[ ! -f "${BASEDIR}"/src/"${LIB_NAME}"/configure ]] || [[ ${RECONF_gnutls} -eq 1 ]]; then
+-  ./bootstrap --skip-po || return 1
+-  git submodule update --remote gnulib || return 1
+-  overwrite_file ./gnulib/lib/fpending.c ./src/gl/fpending.c || return 1
+-fi
+ 
+ ./configure \
+   --prefix="${LIB_INSTALL_PREFIX}" \
+--- a/scripts/apple/libilbc.sh
++++ b/scripts/apple/libilbc.sh
+@@ -1,8 +1,7 @@
+ #!/bin/bash
+ 
+-# INIT SUBMODULES
+-${SED_INLINE} 's|/abseil/|/arthenica/|g' "${BASEDIR}"/src/"${LIB_NAME}"/.gitmodules || return 1
+-git submodule update --init || return 1
++# The Abseil Git submodule is extracted at its recorded commit.
++test -f abseil-cpp/CMakeLists.txt || return 1
+ 
+ mkdir -p "${BUILD_DIR}" || return 1
+ cd "${BUILD_DIR}" || return 1

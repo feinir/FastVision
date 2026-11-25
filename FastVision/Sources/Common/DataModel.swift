@@ -1,0 +1,1086 @@
+//
+//  DataModel.swift
+//  FlowVision
+//
+
+import Foundation
+import Cocoa
+import BTree
+
+extension Map {
+    func elementSafe(atOffset offset: Int) -> Element? {
+        guard offset >= 0 && offset < count else {
+            return nil
+        }
+        return element(atOffset: offset)
+    }
+}
+
+class SortKeyFile: SortKey, NSCopying {
+    func copy(with zone: NSZone? = nil) -> Any {
+        let copy = SortKeyFile(path, createDate: createDate, modDate: modDate, addDate: addDate, size: size, isDir: isDir, isInSameDir: isInSameDir, sortType: sortType, isSortFolderFirst: isSortFolderFirst, isSortUseFullPath: isSortUseFullPath, randomSeed: seed)
+        return copy
+    }
+}
+
+class SortKeyDir: SortKey {
+    override init(_ path: String, createDate: Date = Date(), modDate: Date = Date(), addDate: Date = Date() , size: Int = 0, isDir: Bool = false, isInSameDir: Bool = false, needGetProperties: Bool = false, sortType: SortType = .pathA, isSortFolderFirst: Bool = true, isSortUseFullPath: Bool = true, randomSeed: Int = 0) {
+        // 使用SortKeyDir\([^()]*?,[^()]*?\)来匹配多于一个参数的调用，不应该出现此情况，因为需要使用统一的排序参数
+        // Use SortKeyDir\([^()]*?,[^()]*?\) to match calls with more than one parameter. This should not occur as unified sort parameters are required
+        super.init(path, createDate: createDate, modDate: modDate, addDate: addDate, size: size, isDir: isDir, isInSameDir: isInSameDir, needGetProperties: needGetProperties, sortType: sortType, isSortFolderFirst: isSortFolderFirst, isSortUseFullPath: isSortUseFullPath, randomSeed: randomSeed)
+    }
+}
+
+class SortKey: Comparable {
+    var path: String
+    var pathCmp: String
+    var createDate: Date
+    var modDate: Date
+    var addDate: Date
+    var size: Int
+    var isDir: Bool
+    var isInSameDir: Bool
+    var sortType: SortType
+    var isSortFolderFirst: Bool
+    var isSortUseFullPath: Bool
+    var seed: Int
+    var exifDate: Date = Date(timeIntervalSince1970: 0)
+    var exifPixel: Int = 0
+    var rating: Int = -1
+    var tag: String = ""
+    var isTagLoaded: Bool = false
+    
+    static var keyTransformedDict = Dictionary<String,[String]>()
+    static let keyTransformedDictLock = NSLock()
+    
+    init(_ path: String, createDate: Date = Date(), modDate: Date = Date(), addDate: Date = Date() , size: Int = 0, isDir: Bool = false, isInSameDir: Bool = false, needGetProperties: Bool = false, sortType: SortType, isSortFolderFirst: Bool, isSortUseFullPath: Bool, randomSeed: Int) {
+        self.path = path
+        self.pathCmp = path
+        self.createDate = createDate
+        self.modDate = modDate
+        self.addDate = addDate
+        self.size = size
+        self.isDir = isDir
+        self.isInSameDir = isInSameDir
+        self.sortType = sortType
+        self.isSortFolderFirst = isSortFolderFirst
+        self.isSortUseFullPath = isSortUseFullPath
+        self.seed = randomSeed
+        
+        if needGetProperties,
+           let url = URL(string: path) {
+            do{
+                let properties: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .creationDateKey, .contentModificationDateKey, .addedToDirectoryDateKey]
+                let resourceValues = try url.resourceValues(forKeys: Set(properties))
+                if let tmp = resourceValues.fileSize {
+                    self.size=tmp
+                }
+                if let tmp = resourceValues.creationDate {
+                    self.createDate=tmp
+                }
+                if let tmp = resourceValues.contentModificationDate {
+                    self.modDate=tmp
+                }
+                if let tmp = resourceValues.addedToDirectoryDate {
+                    self.addDate=tmp
+                }
+            }catch{}
+            
+            SortKey.writeExifInfo(self)
+            
+        }
+    }
+    
+    static func removeTrailingSlash(from path: String) -> String {
+        guard path.hasSuffix("/") else { return path }
+        return String(path.dropLast())
+    }
+    
+    static func stripCommonPathPrefixOptimized(_ path1: String, _ path2: String) -> (String, String) {
+        let chars1 = Array(path1)
+        let chars2 = Array(path2)
+        
+        // 找到最短路径长度，防止越界
+        // Find the shortest path length to prevent out of bounds
+        let minLength = min(chars1.count, chars2.count)
+        
+        // 找到公共前缀的长度
+        // Find the length of the common prefix
+        var lastCommonSlash = -1
+        for i in 0..<minLength {
+            if chars1[i] == chars2[i] {
+                if chars1[i] == "/" {
+                    // 记录最后一个公共斜杠的位置
+                    // Record the position of the last common slash
+                    lastCommonSlash = i
+                }
+            } else {
+                break
+            }
+        }
+
+        // 切割公共前缀后的路径部分
+        // Extract path parts after removing the common prefix
+        let uniquePart1 = String(chars1[(lastCommonSlash + 1)...])
+        let uniquePart2 = String(chars2[(lastCommonSlash + 1)...])
+
+        return (uniquePart1, uniquePart2)
+    }
+    
+    static func localCompare(_ a: String, _ b: String) -> Bool {
+        a.localizedStandardCompare(b) == .orderedAscending
+    }
+    
+    static func hashFunction(sortKey: SortKey, seed: Int) -> Int {
+        var hasher = Hasher()
+        hasher.combine(sortKey.path)
+        hasher.combine(sortKey.addDate)
+        hasher.combine(sortKey.createDate)
+        hasher.combine(sortKey.modDate)
+        hasher.combine(seed)
+        return hasher.finalize()
+    }
+    
+    func ext() -> String {
+        if self.isDir {
+            return ""
+        }else{
+            return SortKey.ext(self)
+        }
+    }
+    
+    static func ext(_ sortKey: SortKey) -> String {
+        return (sortKey.path as NSString).pathExtension.lowercased()
+    }
+    
+    static func writeExifInfo(_ sortKey: SortKey) {
+        if !sortKey.isDir{
+            let ext = ext(sortKey)
+            if globalVar.HandledImageAndRawExtensions.contains(ext) {
+                let imageInfo = getImageInfo(url: URL(string: sortKey.path)!, needMetadata: true)
+                let exifData = imageInfo?.properties?[kCGImagePropertyExifDictionary as String] as? [String: Any]
+                let tiffData = imageInfo?.properties?[kCGImagePropertyTIFFDictionary as String] as? [String: Any]
+                // 拍摄时间
+                // Capture time
+                var dateTimeString = exifData?[kCGImagePropertyExifDateTimeOriginal as String] as? String
+                // 以数字化时间为备选
+                // Use digitized time as fallback
+                if dateTimeString == nil {
+                    dateTimeString = exifData?[kCGImagePropertyExifDateTimeDigitized as String] as? String
+                }
+                // 以TIFF时间为备选
+                // Use TIFF time as fallback
+                if dateTimeString == nil {
+                    dateTimeString = tiffData?[kCGImagePropertyTIFFDateTime as String] as? String
+                }
+                if let dateTimeString = dateTimeString {
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
+                    if let date = dateFormatter.date(from: dateTimeString) {
+                        sortKey.exifDate = date
+                    }
+                }
+                // 分辨率
+                // Resolution
+                if let size = imageInfo?.size {
+                    sortKey.exifPixel = Int(size.width * size.height)
+                }
+                // 评级
+                // Rating
+                if let rating = imageInfo?.rating {
+                    sortKey.rating = rating
+                }
+            }
+            if globalVar.HandledVideoExtensions.contains(ext) && isNotFalseTsVideoFile(URL(string: sortKey.path)!) {
+                if let (width,height,date) = getVideoResolutionAndDateFFmpeg(for: URL(string: sortKey.path)!) {
+                    sortKey.exifPixel = width*height
+                    if let date = date {
+                        sortKey.exifDate = date
+                    }
+                }
+            }
+        }
+        
+        if sortKey.exifDate == Date(timeIntervalSince1970: 0) {
+            sortKey.exifDate = Date(timeIntervalSince1970: 1)
+        }
+        if sortKey.exifPixel == 0 {
+            sortKey.exifPixel = 1
+        }
+        if sortKey.rating == -1 {
+            sortKey.rating = 0
+        }
+    }
+    
+    static func writeTagInfo(_ sortKey: SortKey) {
+        if !sortKey.isTagLoaded {
+            if let url = URL(string: sortKey.path) {
+                let tags = (try? url.resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
+                sortKey.tag = tags.sorted().joined(separator: ",")
+            }
+            sortKey.isTagLoaded = true
+        }
+    }
+    
+    static func < (lhs: SortKey, rhs: SortKey) -> Bool {
+        // 异常情况，认为相等
+        // Abnormal case, consider them equal
+        if lhs.sortType != rhs.sortType {return false}
+        
+        if lhs.isSortFolderFirst || lhs.sortType == .sizeA || lhs.sortType == .sizeZ {
+            // 文件夹优先。另外文件夹size为0，按大小排序时还是优先为好
+            // Folders first. Also, folders have size 0, so it's better to prioritize them when sorting by size
+            if lhs.pathCmp != rhs.pathCmp && lhs.isDir && !(rhs.isDir) { return true}
+            if lhs.pathCmp != rhs.pathCmp && !(lhs.isDir) && rhs.isDir { return false}
+        }
+        
+        // 以各种属性排序
+        // Sort by various attributes
+        if lhs.sortType == .sizeA {
+            if lhs.size == rhs.size {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.size < rhs.size
+        }else if lhs.sortType == .sizeZ {
+            if lhs.size == rhs.size {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.size > rhs.size
+        }else if lhs.sortType == .createDateA {
+            if lhs.createDate == rhs.createDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.createDate < rhs.createDate
+        }else if lhs.sortType == .createDateZ {
+            if lhs.createDate == rhs.createDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.createDate > rhs.createDate
+        }else if lhs.sortType == .modDateA {
+            if lhs.modDate == rhs.modDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.modDate < rhs.modDate
+        }else if lhs.sortType == .modDateZ {
+            if lhs.modDate == rhs.modDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.modDate > rhs.modDate
+        }else if lhs.sortType == .addDateA {
+            if lhs.addDate == rhs.addDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.addDate < rhs.addDate
+        }else if lhs.sortType == .addDateZ {
+            if lhs.addDate == rhs.addDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.addDate > rhs.addDate
+        }else if lhs.sortType == .extA {
+            if lhs.ext() == rhs.ext() {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.ext() < rhs.ext()
+        }else if lhs.sortType == .extZ {
+            if lhs.ext() == rhs.ext() {return isSmallerPath(lhs: lhs, rhs: rhs)}
+            return lhs.ext() > rhs.ext()
+        }
+        
+        // 随机排序
+        // Random sort
+        if lhs.sortType == .random {
+            let lhs_hash=hashFunction(sortKey: lhs, seed: lhs.seed)
+            let rhs_hash=hashFunction(sortKey: rhs, seed: rhs.seed)
+            return lhs_hash<rhs_hash
+        }
+        
+        // Exif日期排序
+        // Exif date sort
+        if lhs.sortType == .exifDateA || lhs.sortType == .exifDateZ {
+            if lhs.exifDate == Date(timeIntervalSince1970: 0) {
+                writeExifInfo(lhs)
+            }
+            if rhs.exifDate == Date(timeIntervalSince1970: 0) {
+                writeExifInfo(rhs)
+            }
+            if lhs.sortType == .exifDateA {
+                if lhs.exifDate == rhs.exifDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.exifDate < rhs.exifDate
+            }else if lhs.sortType == .exifDateZ {
+                if lhs.exifDate == rhs.exifDate {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.exifDate > rhs.exifDate
+            }
+        }
+        
+        // Exif像素数排序
+        // Exif pixel count sort
+        if lhs.sortType == .exifPixelA || lhs.sortType == .exifPixelZ {
+            if lhs.exifPixel == 0 {
+                writeExifInfo(lhs)
+            }
+            if rhs.exifPixel == 0 {
+                writeExifInfo(rhs)
+            }
+            if lhs.sortType == .exifPixelA {
+                if lhs.exifPixel == rhs.exifPixel {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.exifPixel < rhs.exifPixel
+            }else if lhs.sortType == .exifPixelZ {
+                if lhs.exifPixel == rhs.exifPixel {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.exifPixel > rhs.exifPixel
+            }
+        }
+        
+        // 评级排序
+        // Rating sort
+        if lhs.sortType == .ratingA || lhs.sortType == .ratingZ {
+            if lhs.rating == -1 {
+                writeExifInfo(lhs)
+            }
+            if rhs.rating == -1 {
+                writeExifInfo(rhs)
+            }
+            if lhs.sortType == .ratingA {
+                if lhs.rating == rhs.rating {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.rating > rhs.rating
+            }else if lhs.sortType == .ratingZ {
+                if lhs.rating == rhs.rating {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.rating < rhs.rating
+            }
+        }
+        
+        // 标签排序
+        // Tag sort
+        if lhs.sortType == .tagA || lhs.sortType == .tagZ {
+            writeTagInfo(lhs)
+            writeTagInfo(rhs)
+            let lEmpty = lhs.tag.isEmpty
+            let rEmpty = rhs.tag.isEmpty
+            if lEmpty != rEmpty {
+                if lhs.sortType == .tagA {
+                    return rEmpty
+                }else{
+                    return lEmpty
+                }
+            }
+            if lhs.sortType == .tagA {
+                if lhs.tag == rhs.tag {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.tag.localizedStandardCompare(rhs.tag) == .orderedAscending
+            }else if lhs.sortType == .tagZ {
+                if lhs.tag == rhs.tag {return isSmallerPath(lhs: lhs, rhs: rhs)}
+                return lhs.tag.localizedStandardCompare(rhs.tag) == .orderedDescending
+            }
+        }
+        
+        // 以文件名排序
+        // Sort by filename
+        if lhs.sortType == .pathZ {
+            return isSmallerPath(lhs: rhs, rhs: lhs)
+        }else{
+            return isSmallerPath(lhs: lhs, rhs: rhs)
+        }
+    }
+    
+    static func isSmallerPath (lhs: SortKey, rhs: SortKey) -> Bool {
+
+        // return lhs.path<rhs.path
+        // return lhs.path.localizedStandardCompare(rhs.path) == .orderedAscending
+        // return lhs.path.compare(rhs.path, options: .numeric) == .orderedAscending
+        // 注意：不加lowercased会导致不满足传递性
+        // Note: Not adding lowercased will lead to non-transitivity
+        // return lhs.path.removingPercentEncoding!.localizedStandardCompare(rhs.path.removingPercentEncoding!) == .orderedAscending
+        // return lhs.path.lowercased().removingPercentEncoding!.localizedStandardCompare(rhs.path.lowercased().removingPercentEncoding!) == .orderedAscending
+        
+        if lhs.pathCmp==rhs.pathCmp { return false }
+        if lhs.pathCmp=="" { return true }
+        if rhs.pathCmp=="" { return false }
+            
+//        let lhs_paths=lhs.path.replacingOccurrences(of: "file://", with: "").split(separator: "/").map(){String($0).lowercased().removingPercentEncoding!}
+//        let rhs_paths=rhs.path.replacingOccurrences(of: "file://", with: "").split(separator: "/").map(){String($0).lowercased().removingPercentEncoding!}
+//
+//        let lhs_paths=lhs.path.replacingOccurrences(of: "file://", with: "").components(separatedBy: "/").map(){$0.lowercased().removingPercentEncoding!}
+//        let rhs_paths=rhs.path.replacingOccurrences(of: "file://", with: "").components(separatedBy: "/").map(){$0.lowercased().removingPercentEncoding!}
+        
+//        let (x,y) = stripCommonPathPrefixOptimized(lhs.path,rhs.path)
+        
+        var lhs_paths: [String]
+        var rhs_paths: [String]
+        // 加锁，防止多线程访问异常
+        // Lock to prevent multi-thread access exceptions
+        keyTransformedDictLock.lock()
+        if keyTransformedDict[lhs.path] != nil {
+            lhs_paths=keyTransformedDict[lhs.path]!
+        }else{
+            lhs_paths=lhs.pathCmp.replacingOccurrences(of: "file://", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "/")).components(separatedBy: "/").map(){$0.removingPercentEncoding!}
+            keyTransformedDict[lhs.path]=lhs_paths
+        }
+        if keyTransformedDict[rhs.path] != nil {
+            rhs_paths=keyTransformedDict[rhs.path]!
+        }else{
+            rhs_paths=rhs.pathCmp.replacingOccurrences(of: "file://", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "/")).components(separatedBy: "/").map(){$0.removingPercentEncoding!}
+            keyTransformedDict[rhs.path]=rhs_paths
+        }
+        // 解锁
+        // Unlock
+        keyTransformedDictLock.unlock()
+        // 0.17s
+
+//        return lhs.path<rhs.path
+        // 0.01s
+        
+        if lhs_paths.count==0 && rhs_paths.count==0 { return localCompare(lhs.pathCmp,rhs.pathCmp) }
+        if lhs_paths.count==0 { return true }
+        if rhs_paths.count==0 { return false }
+        
+        // 先按文件名比较，后按其完整路径（去掉文件名部分）来比较
+        // First compare by filename, then by full path (excluding filename part)
+        if !lhs.isSortUseFullPath && !rhs.isSortUseFullPath {
+            let lhsFileName = lhs_paths.last ?? ""
+            let rhsFileName = rhs_paths.last ?? ""
+            
+            if !lhsFileName.utf8.elementsEqual(rhsFileName.utf8) {
+                return localCompare(lhsFileName, rhsFileName)
+            }
+            
+            // 如果文件名相同，则比较去掉文件名部分的路径
+            // If filenames are the same, compare paths without filename part
+            let lhsPathWithoutFileName = lhs_paths.dropLast()
+            let rhsPathWithoutFileName = rhs_paths.dropLast()
+            
+            for i in 0..<min(lhsPathWithoutFileName.count, rhsPathWithoutFileName.count) {
+                if lhsPathWithoutFileName[i].utf8.elementsEqual(rhsPathWithoutFileName[i].utf8) { continue }
+                if localCompare(lhsPathWithoutFileName[i], rhsPathWithoutFileName[i]) {
+                    return true
+                } else {
+                    return false
+                }
+            }
+            return lhsPathWithoutFileName.count < rhsPathWithoutFileName.count
+        }
+        
+        if lhs.isInSameDir && rhs.isInSameDir && lhs_paths.count==rhs_paths.count {
+            return localCompare(lhs_paths[lhs_paths.count-1],rhs_paths[rhs_paths.count-1])
+        }
+        
+        for i in 0...min(lhs_paths.count,rhs_paths.count)-1 {
+            if lhs_paths[i].utf8.elementsEqual(rhs_paths[i].utf8) { continue }
+//            if lhs_paths[i]<rhs_paths[i]{
+            if localCompare(lhs_paths[i],rhs_paths[i]){
+                return true
+            }else{
+                return false
+            }
+        }
+        if lhs_paths.count < rhs_paths.count {
+            return true
+        }else{
+            return false
+        }
+
+    }
+    
+    static func == (lhs: SortKey, rhs: SortKey) -> Bool {
+        // 异常情况，认为相等
+        // Abnormal case, consider them equal
+        if lhs.sortType != rhs.sortType {return true}
+        if lhs.sortType == .random {
+            return lhs.pathCmp == rhs.pathCmp && lhs.seed == rhs.seed
+        }
+        return lhs.pathCmp == rhs.pathCmp
+    }
+}
+
+class ImageInfo {
+    var size: NSSize?
+    var rating: Int?
+    var properties: [String: Any]?
+    var metadata: CGImageMetadata?
+    var isHDR: Bool = false
+    var ext: String?
+    
+    init(_ size: NSSize?){
+        self.size=size
+    }
+}
+
+class FileModel {
+    init(path: String, ver: Int, isDir: Bool = false, isAlias: Bool = false, fileSize: Int? = nil, createDate: Date? = nil, modDate: Date? = nil, addDate: Date? = nil, doNotActualRead:Bool = false){
+        self.path=path
+        self.ver=ver
+        self.isDir=isDir
+        self.isAlias=isAlias
+        self.fileSize=fileSize
+        self.createDate=createDate
+        self.modDate=modDate
+        self.addDate=addDate
+        self.doNotActualRead=doNotActualRead
+    }
+    var id: Int = 0
+    var idInImage: Int = 0
+    var idInImageAndVideo: Int = 0
+    var path: String
+    var ext: String = ""
+    var type: FileType = .notSet
+    var isAlias: Bool = false
+    var aliasActualExt: String = ""
+    var aliasActualType: FileType = .notSet
+    
+    var originalSize: NSSize?
+    var largeSize: NSSize?
+    var isGetImageSizeFail = false
+    var thumbSize: NSSize?
+    var lineNo: Int = 0
+    var image: NSImage?
+    var folderImages = [NSImage]()
+    var lock: NSLock = NSLock()
+    var isLayoutCalcued: Bool = false
+    var ver: Int
+    var canBeCalcued = false
+    var isDir: Bool
+    var fileSize: Int?
+    var modDate: Date?
+    var createDate: Date?
+    var addDate: Date?
+    var doNotActualRead: Bool = false
+    var isHidden: Bool = false
+    var rotate: Int = 0
+    var imageInfo: ImageInfo?
+    var getThumbFailed = false
+    var finderTags: [String] = []
+}
+
+class DirModel {
+    init(path: String, ver: Int){
+        self.path=path
+        self.ver=ver
+        // self.searchVer=searchVer
+    }
+    var path: String
+    
+    var files = Map<SortKeyFile,FileModel>()
+    var layoutCalcPos = 0
+    var lastLayoutCalcPosUsed = 0
+    var ver: Int
+    // var searchVer: Int
+    var folderCount: Int = 0
+    var fileCount: Int = 0
+    var searchCount: Int = 0
+    var imageCount: Int = 0
+    var videoCount: Int = 0
+    var isMemClearedToAvoidRemainingTask: Bool = false
+    var keepScrollPos: Bool = false
+    var isRecursiveMode: Bool = false
+    var isFiltered: Bool = false
+    var lock: NSLock = NSLock()
+    
+    func changeSortType(_ sortType: SortType, isSortFolderFirst: Bool, isSortUseFullPath: Bool, randomSeed: Int){
+        let oldFiles=files
+        files=Map<SortKeyFile,FileModel>()
+        for oldFile in oldFiles {
+            if let tmpKey=oldFile.0.copy() as? SortKeyFile{
+                tmpKey.sortType=sortType
+                tmpKey.seed=randomSeed
+                tmpKey.isSortFolderFirst=isSortFolderFirst
+                tmpKey.isSortUseFullPath=isSortUseFullPath
+                files[tmpKey]=oldFile.1
+            }
+        }
+        
+        // 暂时无需在此处重设id，因为改变排序后还会重读一遍文件
+        // No need to reset id here temporarily, as files will be re-read after changing sort order
+//        var idInImage=0
+//        var id=0
+//        for ele in files{
+//            ele.1.id=id
+//            id+=1
+//            if !(ele.1.isDir) {
+//                if HandledImageAndRawExtensions.contains(ele.1.ext) {
+//                    ele.1.idInImage=idInImage
+//                    idInImage+=1
+//                }
+//            }
+//        }
+    }
+}
+
+class DatabaseModel {
+    var db = Map<SortKeyDir,DirModel>()
+    var curFolder = "file:///"
+    var dblock: NSLock = NSLock()
+    var ver = 0
+    // var searchVer = 0
+    
+    func lock(){
+        dblock.lock()
+    }
+    func unlock(){
+        dblock.unlock()
+    }
+}
+
+func getMapKeysFile (_ theMap : Map<SortKeyFile,FileModel>) -> [(SortKeyFile,FileModel)]{
+    var keys = [(SortKeyFile,FileModel)]()
+    for ele in theMap{
+        keys.append((ele.0,ele.1))
+    }
+    // log(keys)
+    return keys
+}
+
+class TreeNode: NSObject {
+    var name: String
+    var localizedName: String?
+    var fullPath: String
+    var children: [TreeNode]?
+    var hasChild: Bool = false
+    var isHidden: Bool = false
+    var favoriteIndex: Int?
+    var isFavorite: Bool { favoriteIndex != nil }
+    var isFavoriteSeparator = false
+    
+    init(name: String, children: [TreeNode]? = nil, fullPath: String = "") {
+        self.name = name
+        self.children = children
+        self.fullPath = fullPath
+    }
+}
+
+class TreeViewModel {
+    static let homeURL = FileManager.default.homeDirectoryForCurrentUser
+    // Use an internal name distinct from any volume name.
+    static let homeRootName = homeURL.path
+
+    var root: TreeNode?
+    let favoritesSection = TreeNode(name: NSLocalizedString("Favorites", comment: "收藏夹"))
+    weak var viewController: ViewController!
+
+    func updateFavorites() {
+        var oldChildren = favoritesSection.children ?? []
+        var children: [TreeNode] = []
+        var folderCount = 0
+        for (index, entry) in globalVar.myFavoritesArray.enumerated() {
+            guard folderCount < 8 else { break }
+            let isSeparator = entry == GlobalVar.favoriteSeparator
+            let url = GlobalVar.favoriteURL(for: entry)
+            guard isSeparator || url != nil else { continue }
+            let path = url?.absoluteString ?? ""
+            let node: TreeNode
+            if let oldIndex = oldChildren.firstIndex(where: {
+                $0.fullPath == path && $0.isFavoriteSeparator == isSeparator
+            }) {
+                node = oldChildren.remove(at: oldIndex)
+            } else {
+                node = TreeNode(name: url.map(GlobalVar.favoriteName) ?? "", fullPath: path)
+                node.isFavoriteSeparator = isSeparator
+            }
+            node.favoriteIndex = index
+            children.append(node)
+            if !isSeparator { folderCount += 1 }
+        }
+        favoritesSection.children = children
+    }
+    
+    func initData(path: String) {
+        root = TreeNode(name: "Root", fullPath: path)
+        expand(node: root!, isLookSub: true)
+//        var currentNode = root!
+//        // currentNode.children?.append(TreeNode(name: "test", fullPath: "curPath"))
+//        let newNode = TreeNode(name: "test", fullPath: "curPath")
+//        if currentNode.children == nil {
+//            currentNode.children = [newNode]
+//        } else {
+//            currentNode.children?.append(newNode)
+//        }
+
+    }
+    
+    func hasSubdirectory(at folderURL: URL) -> Bool {
+        if folderURL.path.hasPrefix("/VirtualFinderTagsFolder") {
+            if folderURL.path == "/VirtualFinderTagsFolder" {
+                return true
+            }else{
+                return false
+            }
+        }
+        
+        let fileManager = FileManager.default
+        var options: FileManager.DirectoryEnumerationOptions
+        if viewController.publicVar.isShowHiddenFile {
+            options = [.skipsSubdirectoryDescendants]
+        }else{
+            options = [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+        }
+
+        if let enumerator = fileManager.enumerator(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey], options: options) {
+            for case let fileURL as URL in enumerator {
+                if let resourceValues = try? fileURL.resourceValues(forKeys: [.isDirectoryKey]), resourceValues.isDirectory == true {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+    
+    func expand(node: TreeNode, isLookSub: Bool){
+        guard node !== favoritesSection, !node.isFavorite,
+              let folderURL = URL(string: node.fullPath) else { return }
+        do{
+            var contents = [URL]()
+            
+            // 检查是否是根目录
+            // Check if it's the root directory
+            if folderURL.path == "/VirtualFinderTagsFolder" {
+                for tag in FinderTag.all {
+                    if let encodedName = tag.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+                       let tagURL = URL(string: "file:///VirtualFinderTagsFolder/\(encodedName)/") {
+                        contents.append(tagURL)
+                    }
+                }
+            } else if folderURL.path != "root" {
+                contents = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey, .isUbiquitousItemKey, .isHiddenKey, .contentModificationDateKey, .creationDateKey, .addedToDirectoryDateKey], options: [])
+            }else{
+
+                let fileManager = FileManager.default
+                let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey]
+
+                if let urls = fileManager.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) {
+                    for url in urls {
+                        do {
+                            let resourceValues = try url.resourceValues(forKeys: Set(keys))
+//                            if let volumeName = resourceValues.volumeName {
+//                                print("Volume Name: \(volumeName)")
+//                            }
+//                            if let isRemovable = resourceValues.volumeIsRemovable {
+//                                print("Is Removable: \(isRemovable)")
+//                            }
+//                            if let isInternal = resourceValues.volumeIsInternal {
+//                                print("Is Internal: \(isInternal)")
+//                            }
+                            contents.append(url)
+                        } catch {
+                            log("Error retrieving resource values: \(error)")
+                        }
+                    }
+                } else {
+                    log("No mounted volumes found.")
+                }
+                
+                // let volumesURL = URL(fileURLWithPath: "/Volumes")
+                // contents.append(volumesURL)
+            }
+            
+            // contents.sort { $0.absoluteString < $1.absoluteString }
+            // contents.sort { $0.lastPathComponent.lowercased().localizedStandardCompare($1.lastPathComponent.lowercased()) == .orderedAscending }
+            
+            // 过滤隐藏文件
+            // Filter hidden files
+            contents = contents.filter { url in
+                if url.path.hasPrefix("/VirtualFinderTagsFolder") { return true }
+
+                // 获取隐藏属性
+                // Get hidden attribute
+                let resourceValues = try? url.resourceValues(forKeys: [.isHiddenKey])
+                let isHidden = resourceValues?.isHidden ?? false
+                
+                // 保留 /Volumes 目录
+                // Keep /Volumes directory
+                if url.path == "/Volumes" {
+                    return true
+                }
+                
+                // 保留 用户的 Library 目录
+                // Keep user's Library directory
+//                if url.path == NSHomeDirectory() + "/Library" {
+//                    return true
+//                }
+                
+                // 过滤掉其他隐藏文件
+                // Filter out other hidden files
+                return !isHidden || viewController.publicVar.isShowHiddenFile
+            }
+            
+            // 过滤出目录列表
+            // Filter out directory list
+            var subFolders = contents.filter { url in
+                if url.path.hasPrefix("/VirtualFinderTagsFolder") { return true }
+                guard let isDirectoryResourceValue = try? url.resourceValues(forKeys: [.isDirectoryKey]), let isDirectory = isDirectoryResourceValue.isDirectory else {
+                    return false
+                }
+                return isDirectory
+            }
+            
+            // 排序
+            // Sort
+            // 预取本地化名缓存，避免排序时重复调用 resourceValues（每项只取一次）
+            // Pre-fetch localized name cache to avoid repeated resourceValues calls during sorting
+            var localizedNameCache: [URL: String] = [:]
+            for url in subFolders {
+                if let locName = try? url.resourceValues(forKeys: [.localizedNameKey]).localizedName {
+                    localizedNameCache[url] = locName
+                }
+            }
+
+            // 卷列表保持字母序
+            // Volume list maintains alphabetical order
+            if folderURL.path.hasPrefix("/VirtualFinderTagsFolder") {
+                // 不排序，保持 FinderTag.all 的顺序
+                // No sorting, keep FinderTag.all order
+            } else if folderURL.path == "root" {
+                subFolders.sort {
+                    let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                    let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                    if $0.path == "/" {
+                        return true
+                    }
+                    if $1.path == "/" {
+                        return false
+                    }
+                    return a.localizedStandardCompare(b) == .orderedAscending
+                }
+            }else{
+                let sortType = SortType(rawValue: Int(viewController.publicVar.profile.getValue(forKey: "dirTreeSortType")) ?? 0)
+                if sortType == .pathA {
+                    subFolders.sort {
+                        let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                        let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                        return a.localizedStandardCompare(b) == .orderedAscending
+                    }
+                } else if sortType == .pathZ {
+                    subFolders.sort {
+                        let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                        let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                        return a.localizedStandardCompare(b) == .orderedDescending
+                    }
+                } else if sortType == .createDateA {
+                    subFolders.sort {
+                        let d1 = (try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                        let d2 = (try? $1.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                        if d1 == d2 {
+                            let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                            let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                            return a.localizedStandardCompare(b) == .orderedAscending
+                        }
+                        return d1 < d2
+                    }
+                } else if sortType == .createDateZ {
+                    subFolders.sort {
+                        let d1 = (try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                        let d2 = (try? $1.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? Date.distantPast
+                        if d1 == d2 {
+                            let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                            let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                            return a.localizedStandardCompare(b) == .orderedAscending
+                        }
+                        return d1 > d2
+                    }
+                } else if sortType == .modDateA {
+                    subFolders.sort {
+                        let d1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                        let d2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                        if d1 == d2 {
+                            let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                            let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                            return a.localizedStandardCompare(b) == .orderedAscending
+                        }
+                        return d1 < d2
+                    }
+                } else if sortType == .modDateZ {
+                    subFolders.sort {
+                        let d1 = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                        let d2 = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date.distantPast
+                        if d1 == d2 {
+                            let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                            let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                            return a.localizedStandardCompare(b) == .orderedAscending
+                        }
+                        return d1 > d2
+                    }
+                } else if sortType == .addDateA {
+                    subFolders.sort {
+                        let d1 = (try? $0.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate) ?? Date.distantPast
+                        let d2 = (try? $1.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate) ?? Date.distantPast
+                        if d1 == d2 {
+                            let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                            let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                            return a.localizedStandardCompare(b) == .orderedAscending
+                        }
+                        return d1 < d2
+                    }
+                } else if sortType == .addDateZ {
+                    subFolders.sort {
+                        let d1 = (try? $0.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate) ?? Date.distantPast
+                        let d2 = (try? $1.resourceValues(forKeys: [.addedToDirectoryDateKey]).addedToDirectoryDate) ?? Date.distantPast
+                        if d1 == d2 {
+                            let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                            let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                            return a.localizedStandardCompare(b) == .orderedAscending
+                        }
+                        return d1 > d2
+                    }
+                } else {
+                    subFolders.sort {
+                        let a = localizedNameCache[$0] ?? $0.lastPathComponent
+                        let b = localizedNameCache[$1] ?? $1.lastPathComponent
+                        return a.localizedStandardCompare(b) == .orderedAscending
+                    }
+                }
+            }
+
+            if folderURL.path == "root" {
+                let finderTagsURL = URL(string: "file:///VirtualFinderTagsFolder/")!
+                subFolders.insert(Self.homeURL, at: 0)
+                subFolders.append(finderTagsURL)
+            }
+
+            if globalVar.autoHideToolbar && folderURL.path == "root" {
+                subFolders.insert(URL(fileURLWithPath: "/PlaceholderForAutoHideToolbar"), at: 0)
+            }
+            
+            let oldChildren=node.children
+            node.children=[]
+            
+            for subFolder in subFolders {
+                var name = subFolder.lastPathComponent
+                var localizedName = localizedNameCache[subFolder]
+                var fullPath = subFolder.absoluteString
+                if folderURL.path == "root", subFolder == Self.homeURL {
+                    name = Self.homeRootName
+                    localizedName = NSUserName()
+                }
+                if name == "/" {
+                    localizedName = ROOT_NAME
+                }
+                if name == "PlaceholderForAutoHideToolbar" {
+                    localizedName = "FastVision"
+                    fullPath = "file:///FastVisionTitleFolder/"
+                }
+                if subFolder.absoluteString.hasPrefix("file:///VirtualFinderTagsFolder") {
+                    if subFolder.absoluteString == "file:///VirtualFinderTagsFolder/" {
+                        name = NSLocalizedString("Finder Tags", comment: "Finder标签")
+                    }else{
+                        
+                    }
+                }
+                var newNode = TreeNode(name: name, fullPath: fullPath)
+                newNode.localizedName = localizedName
+                newNode.isHidden = (try? subFolder.resourceValues(forKeys: [.isHiddenKey]))?.isHidden ?? false
+                
+                if oldChildren?.contains(where: { $0.name == newNode.name }) ?? false {
+                    newNode = oldChildren!.first(where: { $0.name == newNode.name })!
+                }
+                node.children?.append(newNode)
+                
+                if isLookSub{
+                    let isExt = VolumeManager.shared.isExternalVolume(subFolder)
+                    if isExt && globalVar.folderSearchDepth_External == 0 {
+                        newNode.hasChild=true
+                    }else if !isExt && globalVar.folderSearchDepth == 0 {
+                        newNode.hasChild=true
+                    }else{
+                        do{
+                            let resourceValues = try subFolder.resourceValues(forKeys: Set([.isUbiquitousItemKey]))
+                            if let doNotActualRead = resourceValues.isUbiquitousItem {
+                                if doNotActualRead {
+                                    newNode.hasChild=true
+                                }else{
+                                    newNode.hasChild=hasSubdirectory(at: URL(string:newNode.fullPath)!)
+                                }
+                            }else{
+                                newNode.hasChild=hasSubdirectory(at: URL(string:newNode.fullPath)!)
+                            }
+                        }catch{}
+                    }
+                }
+            }
+
+            if folderURL.path == "root" {
+                updateFavorites()
+                let favoritesIndex = globalVar.autoHideToolbar ? 1 : 0
+                node.children?.insert(favoritesSection, at: favoritesIndex)
+            }
+        }catch{
+            return
+        }
+    }
+
+}
+
+typealias TaskType = (String, DirModel, SortKeyFile, FileModel, Int, OtherTaskInfo)
+
+class OtherTaskInfo {
+    var isFromScroll: Bool
+    var isPriorityScheduled: Bool
+    
+    init(isFromScroll: Bool = false, isPriorityScheduled: Bool = false) {
+        self.isFromScroll = isFromScroll
+        self.isPriorityScheduled = isPriorityScheduled
+    }
+}
+
+class TaskPool {
+    var pool = Dictionary<String,[TaskType]>()
+    var priority = Dictionary<String,Double>()
+    var lock = NSLock()
+    func makeQueue(_ queueName: String){
+        if pool[queueName] == nil {
+            pool[queueName]=[TaskType]()
+            priority[queueName]=10.0
+        }
+    }
+    func push(_ queueName: String, _ ele: TaskType){
+        if pool[queueName] != nil {
+            pool[queueName]?.append(ele)
+        }else{
+            pool[queueName]=[TaskType]()
+            pool[queueName]?.append(ele)
+            priority[queueName]=10.0
+        }
+    }
+    func pop() -> TaskType? {
+        if pool.count == 0 {return nil}
+        
+        var prioritySum=0.0
+        for (key,pri) in priority {
+            if pool[key]!.count != 0 {
+                prioritySum+=pri
+            }
+        }
+        let randPos=Double.random(in: 0.0...prioritySum)
+        prioritySum=0.0
+        var queueName=pool.first!.key
+        for (key,pri) in priority {
+            if pool[key]!.count != 0 {
+                prioritySum+=pri
+            }
+            if randPos<=prioritySum {
+                queueName=key
+                break
+            }
+        }
+        if pool[queueName]!.count != 0 {
+            return pool[queueName]!.removeFirst()
+        }else{
+            return nil
+        }
+    }
+    func popSafe0() -> TaskType? {
+        lock.lock()
+        let tmp = pop()
+        lock.unlock()
+        return tmp
+    }
+    func removeQueue(queueName: String) {
+        pool.removeValue(forKey: queueName)
+        priority.removeValue(forKey: queueName)
+    }
+    func setMostPriority(queueName: String) {
+        if pool.count == 0 {return}
+        
+        for (key,_) in priority {
+            if key == queueName {
+                priority[key]=10.0
+            }else{
+                priority[key]=2.0
+            }
+        }
+    }
+    func getTaskNum() -> Int {
+        var count = 0
+        for (_,aPool) in pool {
+            count += aPool.count
+        }
+        return count
+    }
+    func removeAllQueue(){
+        if pool.count == 0 {return}
+        var keysToRemove: [String] = []
+        for (key,_) in priority {
+            keysToRemove.append(key)
+        }
+        for key in keysToRemove {
+            removeQueue(queueName: key)
+        }
+    }
+}

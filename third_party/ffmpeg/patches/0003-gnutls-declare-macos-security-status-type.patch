@@ -1,0 +1,11 @@
+--- a/src/gnutls/lib/system/certs.c
++++ b/src/gnutls/lib/system/certs.c
+@@ -278,7 +278,7 @@
+ }
+ #elif defined(__APPLE__) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+ static
+-int osstatus_error(status)
++int osstatus_error(OSStatus status)
+ {
+ 	CFStringRef err_str = SecCopyErrorMessageString(status, NULL);
+ 	_gnutls_debug_log("Error loading system root certificates: %s\n",
