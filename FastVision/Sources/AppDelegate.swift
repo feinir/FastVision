@@ -278,6 +278,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // End applicationDidFinishLaunching
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        PhotoCropWindowController.allowTermination(sender)
+    }
+
     func applicationWillTerminate(_ aNotification: Notification) {
         EnhancedIndex.flushPendingSave()
         log("App EXIT")
@@ -742,7 +746,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         }
     }
     
+    private var browserDeleteMenuTitle: String?
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        let editor = NSApp.keyWindow?.windowController as? PhotoCropWindowController
+        switch menuItem.action {
+        case #selector(saveEditedPhoto(_:)): return editor?.canSave == true
+        case #selector(saveEditedPhotoAs(_:)): return editor?.canSaveAs == true
+        case #selector(undoPhotoCrop(_:)): return editor?.canUndoCrop == true
+        case #selector(redoPhotoCrop(_:)): return editor?.canRedoCrop == true
+        case #selector(applyPhotoCrop(_:)): return editor?.canApplyCrop == true
+        case #selector(editDelete(_:)):
+            if let editor {
+                if browserDeleteMenuTitle == nil { browserDeleteMenuTitle = menuItem.title }
+                menuItem.title = PhotoCropWindowController.deleteAnnotationTitle
+                return editor.canDeleteAnnotation
+            }
+            if let browserDeleteMenuTitle {
+                menuItem.title = browserDeleteMenuTitle
+                self.browserDeleteMenuTitle = nil
+            }
+        default: break
+        }
         // 如果焦点在标准文本控件上，启用复制/剪切/粘贴/选择全部菜单
         // If focus is on standard text controls, enable copy/cut/paste/select all menu
         if menuItem.action == #selector(editCopy(_:)) || menuItem.action == #selector(editCut(_:)) || menuItem.action == #selector(editPaste(_:)) || menuItem.action == #selector(selectAll(_:)) {
@@ -759,6 +784,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             }else{
                 return false
             }
+        }
+        if menuItem.action == #selector(openPhotoCropEditor(_:)) {
+            return mainViewController.photoForEditing != nil
+        }
+        if let review = mainViewController.similarPhotosViewController {
+            if menuItem.action == #selector(editDelete(_:)) { return review.canMarkSelectionForTrash }
+            if [#selector(editCopy(_:)), #selector(editCut(_:)), #selector(editPaste(_:)), #selector(editMove(_:))].contains(menuItem.action) {
+                return false
+            }
+        }
+        if menuItem.action == #selector(findSimilarPhotos(_:)) {
+            return !mainViewController.publicVar.isInLargeView
         }
         // 重新打开关闭的标签页
         // Reopen closed tabs
@@ -1069,7 +1106,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         if let firstResponder = NSApp.keyWindow?.firstResponder {
             if firstResponder is NSTextView || firstResponder is NSTextField { return }
         }
+        if let editor = NSApp.keyWindow?.windowController as? PhotoCropWindowController {
+            editor.deleteSelectedAnnotation(sender)
+            return
+        }
         guard let mainViewController=getMainViewController() else{return}
+        if let review = mainViewController.similarPhotosViewController {
+            review.markSelectionForTrash(sender)
+            return
+        }
         if mainViewController.publicVar.isInLargeView {
             mainViewController.handleDelete()
         }else{
@@ -1256,6 +1301,34 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         }
     }
     
+    @IBAction func saveEditedPhoto(_ sender: NSMenuItem) {
+        (NSApp.keyWindow?.windowController as? PhotoCropWindowController)?.saveDocument(sender)
+    }
+
+    @IBAction func saveEditedPhotoAs(_ sender: NSMenuItem) {
+        (NSApp.keyWindow?.windowController as? PhotoCropWindowController)?.saveDocumentAs(sender)
+    }
+
+    @IBAction func undoPhotoCrop(_ sender: NSMenuItem) {
+        (NSApp.keyWindow?.windowController as? PhotoCropWindowController)?.undoCrop(sender)
+    }
+
+    @IBAction func redoPhotoCrop(_ sender: NSMenuItem) {
+        (NSApp.keyWindow?.windowController as? PhotoCropWindowController)?.redoCrop(sender)
+    }
+
+    @IBAction func applyPhotoCrop(_ sender: NSMenuItem) {
+        (NSApp.keyWindow?.windowController as? PhotoCropWindowController)?.applyCrop(sender)
+    }
+
+    @IBAction func openPhotoCropEditor(_ sender: NSMenuItem) {
+        getMainViewController()?.showPhotoEditor(sender)
+    }
+
+    @IBAction func findSimilarPhotos(_ sender: NSMenuItem) {
+        getMainViewController()?.showSimilarPhotos(sender)
+    }
+
     @IBAction func customLayoutStyle(_ sender: NSMenuItem){
         getMainViewController()?.customLayoutStylePrompt()
     }

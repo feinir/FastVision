@@ -19,12 +19,14 @@ Captured in FastVision 1.8.0 with a sample collection.
 - Browse folders in waterfall, grid, or justified layouts. Enable recursive browsing to see media from subfolders together.
 - Keep frequently used folders in Favorites and open Home, mounted volumes, and Finder Tags from the sidebar.
 - Search by file name, filter by Finder tag or rating, and open folders in tabs.
+- Find similar photos from the toolbar or photo context menu, mark photos across groups, and review the full list before moving them to the Trash.
+- Open **Edit Photo** for rectangular cropping, perspective correction, rotation, and editable shape, text, and brush annotations. Choose **Save** or **Save As** when the edit is ready.
 - Zoom in on photos, view HDR images on supported displays, and preview or play videos.
 - Copy, move, rename, and reveal files in Finder from the browser.
 
 ## Get started
 
-FastVision requires **macOS 12 or later** and supports both Apple Silicon and Intel Macs. Download the DMG for a published version from [GitHub Releases](https://github.com/feinir/FastVision/releases), open it, and drag FastVision into Applications. The release page also provides the corresponding source archive and SHA-256 checksums.
+FastVision requires **macOS 12 or later** and supports both Apple Silicon and Intel Macs. Download the DMG for a published version from [GitHub Releases](https://github.com/feinir/FastVision/releases), open it, and drag FastVision into Applications. Each release links to the corresponding source, including the bundled dependencies, and provides the DMG’s SHA-256 checksum.
 
 Use **File → Open…** to choose a folder. Double-click a thumbnail to open the preview, then use the arrow keys to browse or press **Esc** to return to the thumbnails. Use **⌘F** to search.
 

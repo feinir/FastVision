@@ -142,6 +142,12 @@ class CustomCollectionView: NSCollectionView {
 
                     buildFilterMenuItems(in: menu)
 
+                    let similarPhotos = menu.addItem(
+                        withTitle: NSLocalizedString("similar-photo-action", value: "Find Similar Photos", comment: ""),
+                        action: #selector(ViewController.showSimilarPhotos(_:)), keyEquivalent: ""
+                    )
+                    similarPhotos.target = viewController
+
                     menu.addItem(NSMenuItem.separator())
                     
                     // let actionItemCopyPath = menu.addItem(withTitle: NSLocalizedString("Copy Path", comment: "复制路径"), action: #selector(actCopyPath), keyEquivalent: "")
@@ -180,7 +186,9 @@ class CustomCollectionView: NSCollectionView {
                     let actionItemRefresh = menu.addItem(withTitle: NSLocalizedString("Refresh", comment: "刷新"), action: #selector(actRefresh), keyEquivalent: "r")
                     actionItemRefresh.keyEquivalentModifierMask = [.command]
                     
-                    menu.items.forEach { $0.target = self }
+                    for item in menu.items where item.target == nil && item.action != nil {
+                        item.target = self
+                    }
                     NSMenu.popUpContextMenu(menu, with: event, for: self)
                 }
             }

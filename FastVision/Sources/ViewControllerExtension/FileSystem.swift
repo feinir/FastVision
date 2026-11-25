@@ -842,6 +842,8 @@ extension ViewController {
         fileDB.db[SortKeyDir(path)]?.lastLayoutCalcPosUsed=0
         fileDB.unlock()
 
+        if lastCurFolder != path { closeSimilarPhotos(restoreFocus: false) }
+
         // 如果是打开文件的情况，则设置标题、加载大图附近的缩略图
         if let openedFile {
             setWindowTitleOfLargeImage(file: openedFile)

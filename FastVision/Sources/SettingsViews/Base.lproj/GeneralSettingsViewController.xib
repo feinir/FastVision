@@ -205,7 +205,7 @@ Restart the application for changes to take effect.</string>
                         <gridCell row="hB1-BQ-zjj" column="cs9-fm-l2F" id="MjO-gZ-k09">
                             <button key="contentView" verticalHuggingPriority="750" translatesAutoresizingMaskIntoConstraints="NO" id="7Xr-Ss-qcW">
                                 <rect key="frame" x="108" y="337" width="125" height="32"/>
-                                <buttonCell key="cell" type="push" title="Select Folder..." bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="BFV-85-Ue3">
+                                <buttonCell key="cell" type="push" title="Select Folder" bezelStyle="rounded" alignment="center" borderStyle="border" imageScaling="proportionallyDown" inset="2" id="BFV-85-Ue3">
                                     <behavior key="behavior" pushIn="YES" lightByBackground="YES" lightByGray="YES"/>
                                     <font key="font" metaFont="system"/>
                                 </buttonCell>

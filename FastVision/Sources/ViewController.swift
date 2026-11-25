@@ -305,6 +305,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
     var initLargeImagePos = -1
     var currLargeImagePos = -1
     var fileDB = DatabaseModel()
+    var similarPhotosViewController: SimilarPhotosViewController?
     
     var readInfoTaskPool = [TaskType]()
     var readInfoTaskPoolLock = NSLock()
@@ -768,7 +769,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window {
+            if event.window != self.view.window || self.similarPhotosViewController != nil {
                 return event
             }
             if self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -795,6 +796,18 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         // Monitor keyboard key presses
         eventMonitorKeyDown = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self=self else{return event}
+            if event.window === self.view.window, let review = self.similarPhotosViewController {
+                switch event.keyCode {
+                case 53:
+                    review.requestClose()
+                    return nil
+                case 51, 117:
+                    if !event.isARepeat { review.markSelectionForTrash(nil) }
+                    return nil
+                default:
+                    return event
+                }
+            }
             return self.KeyShortcutManager(event: event)
         }
         
@@ -804,7 +817,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window {
+            if event.window != self.view.window || self.similarPhotosViewController != nil {
                 return event
             }
             if true || self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -823,7 +836,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window {
+            if event.window != self.view.window || self.similarPhotosViewController != nil {
                 return event
             }
             if self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -842,7 +855,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window {
+            if event.window != self.view.window || self.similarPhotosViewController != nil {
                 return event
             }
             if true || self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -869,6 +882,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
     }
     
     func prepareForDeinit() {
+        closeSimilarPhotos(restoreFocus: false)
         // 在这里执行清理工作
         // Perform cleanup work here
         log("ViewController is being deinitialized")

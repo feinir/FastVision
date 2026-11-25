@@ -1869,8 +1869,11 @@ class LargeImageView: NSView {
             
             menu.addItem(NSMenuItem.separator())
             
-            if URL(string: file.path)!.hasDirectoryPath == false {
-                addOpenWithSubMenu(to: menu, for: URL(string: file.path)!)
+            if let url = URL(string: file.path), !url.hasDirectoryPath {
+                if file.type == .image, url.isFileURL {
+                    viewController.addPhotoEditorItem(to: menu, for: url)
+                }
+                addOpenWithSubMenu(to: menu, for: url)
             }
             
             menu.addItem(withTitle: NSLocalizedString("Show in Finder", comment: "在Finder中显示"), action: #selector(actShowInFinder), keyEquivalent: "")
@@ -1973,7 +1976,9 @@ class LargeImageView: NSView {
             let actionItemRefresh = menu.addItem(withTitle: NSLocalizedString("Refresh", comment: "刷新"), action: #selector(actRefresh), keyEquivalent: "r")
             actionItemRefresh.keyEquivalentModifierMask = [.command]
             
-            menu.items.forEach { $0.target = self }
+            for item in menu.items where item.target == nil && item.action != nil {
+                item.target = self
+            }
             NSMenu.popUpContextMenu(menu, with: event, for: self)
         }
         

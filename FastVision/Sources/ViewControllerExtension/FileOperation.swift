@@ -5,6 +5,7 @@
 
 import Foundation
 import Cocoa
+import Darwin
 import AVFoundation
 import DiskArbitration
 
@@ -482,6 +483,7 @@ extension ViewController {
         var shouldSkipAll = false
         var shouldAutoRenameAll = false
         let sharedMergeState = MergeConflictState()
+        defer { sharedMergeState.reportReplacementFailures() }
         
         let StoreIsKeyEventEnabled = publicVar.isKeyEventEnabled
         publicVar.isKeyEventEnabled = false
@@ -508,16 +510,12 @@ extension ViewController {
             if FileManager.default.fileExists(atPath: destURL.path) {
                 // 检测源和目标是否都是文件夹
                 // Check if both source and destination are folders
-                var srcIsDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &srcIsDir)
-                var dstIsDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: destURL.path, isDirectory: &dstIsDir)
-                let bothAreFolders = srcIsDir.boolValue && dstIsDir.boolValue
+                let bothAreFolders = SafeFileReplacement.isDirectory(at: fileURL)
+                    && SafeFileReplacement.isDirectory(at: destURL)
                 
                 if shouldReplaceAll {
                     do {
-                        try FileManager.default.removeItem(at: destURL)
-                        try FileManager.default.copyItem(at: fileURL, to: destURL)
+                        try sharedMergeState.replaceItem(from: fileURL, to: destURL, moving: false)
                         successfulDestURLs.append(destURL.absoluteString)
                         publicVar.fileChangedCount += 1
                     } catch {
@@ -552,8 +550,7 @@ extension ViewController {
                     switch userChoice {
                     case .replace:
                         do {
-                            try FileManager.default.removeItem(at: destURL)
-                            try FileManager.default.copyItem(at: fileURL, to: destURL)
+                            try sharedMergeState.replaceItem(from: fileURL, to: destURL, moving: false)
                             successfulDestURLs.append(destURL.absoluteString)
                             publicVar.fileChangedCount += 1
                         } catch {
@@ -562,8 +559,7 @@ extension ViewController {
                     case .replaceAll:
                         shouldReplaceAll = true
                         do {
-                            try FileManager.default.removeItem(at: destURL)
-                            try FileManager.default.copyItem(at: fileURL, to: destURL)
+                            try sharedMergeState.replaceItem(from: fileURL, to: destURL, moving: false)
                             successfulDestURLs.append(destURL.absoluteString)
                             publicVar.fileChangedCount += 1
                         } catch {
@@ -786,6 +782,7 @@ extension ViewController {
         var shouldSkipAll = false
         var shouldAutoRenameAll = false
         let sharedMergeState = MergeConflictState()
+        defer { sharedMergeState.reportReplacementFailures() }
         
         let StoreIsKeyEventEnabled = publicVar.isKeyEventEnabled
         publicVar.isKeyEventEnabled = false
@@ -812,16 +809,12 @@ extension ViewController {
             if FileManager.default.fileExists(atPath: destURL.path) {
                 // 检测源和目标是否都是文件夹
                 // Check if both source and destination are folders
-                var srcIsDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: fileURL.path, isDirectory: &srcIsDir)
-                var dstIsDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: destURL.path, isDirectory: &dstIsDir)
-                let bothAreFolders = srcIsDir.boolValue && dstIsDir.boolValue
+                let bothAreFolders = SafeFileReplacement.isDirectory(at: fileURL)
+                    && SafeFileReplacement.isDirectory(at: destURL)
                 
                 if shouldReplaceAll {
                     do {
-                        try FileManager.default.removeItem(at: destURL)
-                        try FileManager.default.moveItem(at: fileURL, to: destURL)
+                        try sharedMergeState.replaceItem(from: fileURL, to: destURL, moving: true)
                         successfulDestURLs.append(destURL.absoluteString)
                         publicVar.fileChangedCount += 1
                     } catch {
@@ -856,8 +849,7 @@ extension ViewController {
                     switch userChoice {
                     case .replace:
                         do {
-                            try FileManager.default.removeItem(at: destURL)
-                            try FileManager.default.moveItem(at: fileURL, to: destURL)
+                            try sharedMergeState.replaceItem(from: fileURL, to: destURL, moving: true)
                             successfulDestURLs.append(destURL.absoluteString)
                             publicVar.fileChangedCount += 1
                         } catch {
@@ -866,8 +858,7 @@ extension ViewController {
                     case .replaceAll:
                         shouldReplaceAll = true
                         do {
-                            try FileManager.default.removeItem(at: destURL)
-                            try FileManager.default.moveItem(at: fileURL, to: destURL)
+                            try sharedMergeState.replaceItem(from: fileURL, to: destURL, moving: true)
                             successfulDestURLs.append(destURL.absoluteString)
                             publicVar.fileChangedCount += 1
                         } catch {
@@ -1112,10 +1103,8 @@ extension ViewController {
     }
 
     func showReplaceDialog(for url: URL, sourceURL: URL? = nil, isSingle: Bool, isMove: Bool) -> ReplaceDialogUserChoice {
-        var srcIsDir: ObjCBool = false
-        let sourceIsFolder = sourceURL != nil && FileManager.default.fileExists(atPath: sourceURL!.path, isDirectory: &srcIsDir) && srcIsDir.boolValue
-        var dstIsDir: ObjCBool = false
-        let destIsFolder = FileManager.default.fileExists(atPath: url.path, isDirectory: &dstIsDir) && dstIsDir.boolValue
+        let sourceIsFolder = sourceURL.map(SafeFileReplacement.isDirectory(at:)) ?? false
+        let destIsFolder = SafeFileReplacement.isDirectory(at: url)
         let canMerge = sourceIsFolder && destIsFolder
         
         let alert = NSAlert()
@@ -1186,6 +1175,24 @@ extension ViewController {
         var shouldSkipAll = false
         var shouldAutoRenameAll = false
         var cancelled = false
+        private var replacementFailures: [String] = []
+
+        func replaceItem(from source: URL, to destination: URL, moving: Bool) throws {
+            do {
+                try SafeFileReplacement.replace(from: source, to: destination, moving: moving)
+            } catch {
+                replacementFailures.append("\(destination.path): \(error.localizedDescription)")
+                throw error
+            }
+        }
+
+        func reportReplacementFailures() {
+            guard !replacementFailures.isEmpty else { return }
+            showInformationLong(
+                title: NSLocalizedString("replacement-failed", value: "Could Not Replace Items", comment: ""),
+                message: replacementFailures.joined(separator: "\n\n")
+            )
+        }
     }
     
     @discardableResult
@@ -1193,10 +1200,7 @@ extension ViewController {
         let fm = FileManager.default
         let state = state ?? MergeConflictState()
         
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: sourceURL.path, isDirectory: &isDir), isDir.boolValue else {
-            return false
-        }
+        guard SafeFileReplacement.isDirectory(at: sourceURL) else { return false }
         
         if !fm.fileExists(atPath: destURL.path) {
             do {
@@ -1208,7 +1212,9 @@ extension ViewController {
             }
         }
         
-        guard let contents = try? fm.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
+        guard SafeFileReplacement.isDirectory(at: destURL),
+              (try? SafeFileReplacement.validateSeparateItems(from: sourceURL, to: destURL)) != nil,
+              let contents = try? fm.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
             return false
         }
         
@@ -1218,20 +1224,17 @@ extension ViewController {
             
             var destItemURL = destURL.appendingPathComponent(itemURL.lastPathComponent)
             
-            var srcIsDir: ObjCBool = false
-            fm.fileExists(atPath: itemURL.path, isDirectory: &srcIsDir)
-            var dstIsDir: ObjCBool = false
-            let destExists = fm.fileExists(atPath: destItemURL.path, isDirectory: &dstIsDir)
-            
-            if srcIsDir.boolValue && destExists && dstIsDir.boolValue {
+            let sourceIsDirectory = SafeFileReplacement.isDirectory(at: itemURL)
+            let destExists = fm.fileExists(atPath: destItemURL.path)
+
+            if sourceIsDirectory && destExists && SafeFileReplacement.isDirectory(at: destItemURL) {
                 if !mergeFolderByCopy(from: itemURL, to: destItemURL, state: state) {
                     allSuccess = false
                 }
             } else if destExists {
                 if itemURL.lastPathComponent == ".DS_Store" {
                     do {
-                        try fm.removeItem(at: destItemURL)
-                        try fm.copyItem(at: itemURL, to: destItemURL)
+                        try state.replaceItem(from: itemURL, to: destItemURL, moving: false)
                     } catch {
                         log("Merge copy failed (.DS_Store): \(error)", level: .error)
                     }
@@ -1239,8 +1242,7 @@ extension ViewController {
                 }
                 if state.shouldReplaceAll {
                     do {
-                        try fm.removeItem(at: destItemURL)
-                        try fm.copyItem(at: itemURL, to: destItemURL)
+                        try state.replaceItem(from: itemURL, to: destItemURL, moving: false)
                     } catch {
                         log("Merge copy failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                         allSuccess = false
@@ -1260,8 +1262,7 @@ extension ViewController {
                     switch choice {
                     case .replace:
                         do {
-                            try fm.removeItem(at: destItemURL)
-                            try fm.copyItem(at: itemURL, to: destItemURL)
+                            try state.replaceItem(from: itemURL, to: destItemURL, moving: false)
                         } catch {
                             log("Merge copy failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                             allSuccess = false
@@ -1269,21 +1270,19 @@ extension ViewController {
                     case .replaceAll:
                         state.shouldReplaceAll = true
                         do {
-                            try fm.removeItem(at: destItemURL)
-                            try fm.copyItem(at: itemURL, to: destItemURL)
+                            try state.replaceItem(from: itemURL, to: destItemURL, moving: false)
                         } catch {
                             log("Merge copy failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                             allSuccess = false
                         }
                     case .merge, .mergeAll:
-                        if srcIsDir.boolValue {
+                        if sourceIsDirectory {
                             if !mergeFolderByCopy(from: itemURL, to: destItemURL, state: state) {
                                 allSuccess = false
                             }
                         } else {
                             do {
-                                try fm.removeItem(at: destItemURL)
-                                try fm.copyItem(at: itemURL, to: destItemURL)
+                                try state.replaceItem(from: itemURL, to: destItemURL, moving: false)
                             } catch {
                                 log("Merge copy failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                                 allSuccess = false
@@ -1333,10 +1332,7 @@ extension ViewController {
         let fm = FileManager.default
         let state = state ?? MergeConflictState()
         
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: sourceURL.path, isDirectory: &isDir), isDir.boolValue else {
-            return false
-        }
+        guard SafeFileReplacement.isDirectory(at: sourceURL) else { return false }
         
         if !fm.fileExists(atPath: destURL.path) {
             do {
@@ -1348,7 +1344,9 @@ extension ViewController {
             }
         }
         
-        guard let contents = try? fm.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
+        guard SafeFileReplacement.isDirectory(at: destURL),
+              (try? SafeFileReplacement.validateSeparateItems(from: sourceURL, to: destURL)) != nil,
+              let contents = try? fm.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
             return false
         }
         
@@ -1358,20 +1356,17 @@ extension ViewController {
             
             var destItemURL = destURL.appendingPathComponent(itemURL.lastPathComponent)
             
-            var srcIsDir: ObjCBool = false
-            fm.fileExists(atPath: itemURL.path, isDirectory: &srcIsDir)
-            var dstIsDir: ObjCBool = false
-            let destExists = fm.fileExists(atPath: destItemURL.path, isDirectory: &dstIsDir)
-            
-            if srcIsDir.boolValue && destExists && dstIsDir.boolValue {
+            let sourceIsDirectory = SafeFileReplacement.isDirectory(at: itemURL)
+            let destExists = fm.fileExists(atPath: destItemURL.path)
+
+            if sourceIsDirectory && destExists && SafeFileReplacement.isDirectory(at: destItemURL) {
                 if !mergeFolderByMove(from: itemURL, to: destItemURL, state: state) {
                     allSuccess = false
                 }
             } else if destExists {
                 if itemURL.lastPathComponent == ".DS_Store" {
                     do {
-                        try fm.removeItem(at: destItemURL)
-                        try fm.moveItem(at: itemURL, to: destItemURL)
+                        try state.replaceItem(from: itemURL, to: destItemURL, moving: true)
                     } catch {
                         log("Merge move failed (.DS_Store): \(error)", level: .error)
                     }
@@ -1379,8 +1374,7 @@ extension ViewController {
                 }
                 if state.shouldReplaceAll {
                     do {
-                        try fm.removeItem(at: destItemURL)
-                        try fm.moveItem(at: itemURL, to: destItemURL)
+                        try state.replaceItem(from: itemURL, to: destItemURL, moving: true)
                     } catch {
                         log("Merge move failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                         allSuccess = false
@@ -1400,8 +1394,7 @@ extension ViewController {
                     switch choice {
                     case .replace:
                         do {
-                            try fm.removeItem(at: destItemURL)
-                            try fm.moveItem(at: itemURL, to: destItemURL)
+                            try state.replaceItem(from: itemURL, to: destItemURL, moving: true)
                         } catch {
                             log("Merge move failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                             allSuccess = false
@@ -1409,21 +1402,19 @@ extension ViewController {
                     case .replaceAll:
                         state.shouldReplaceAll = true
                         do {
-                            try fm.removeItem(at: destItemURL)
-                            try fm.moveItem(at: itemURL, to: destItemURL)
+                            try state.replaceItem(from: itemURL, to: destItemURL, moving: true)
                         } catch {
                             log("Merge move failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                             allSuccess = false
                         }
                     case .merge, .mergeAll:
-                        if srcIsDir.boolValue {
+                        if sourceIsDirectory {
                             if !mergeFolderByMove(from: itemURL, to: destItemURL, state: state) {
                                 allSuccess = false
                             }
                         } else {
                             do {
-                                try fm.removeItem(at: destItemURL)
-                                try fm.moveItem(at: itemURL, to: destItemURL)
+                                try state.replaceItem(from: itemURL, to: destItemURL, moving: true)
                             } catch {
                                 log("Merge move failed (\(itemURL.lastPathComponent)): \(error)", level: .error)
                                 allSuccess = false
@@ -1466,11 +1457,8 @@ extension ViewController {
             }
         }
         
-        // Remove source directory if it's now empty or all items were moved
-        let remaining = try? fm.contentsOfDirectory(at: sourceURL, includingPropertiesForKeys: nil, options: [])
-        if remaining?.isEmpty ?? true {
-            try? fm.removeItem(at: sourceURL)
-        }
+        // Remove only an empty directory. A failed listing must never delete unmoved files.
+        _ = rmdir(sourceURL.path)
         
         return allSuccess
     }

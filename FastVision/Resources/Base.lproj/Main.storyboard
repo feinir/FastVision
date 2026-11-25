@@ -115,14 +115,14 @@
                                                 <action selector="performClose:" target="Ady-hI-5gd" id="HmO-Ls-i7Q"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Save…" hidden="YES" keyEquivalent="s" id="pxx-59-PXV">
+                                        <menuItem title="Save" keyEquivalent="s" id="pxx-59-PXV">
                                             <connections>
-                                                <action selector="saveDocument:" target="Ady-hI-5gd" id="teZ-XB-qJY"/>
+                                                <action selector="saveEditedPhoto:" target="Voe-Tx-rLC" id="teZ-XB-qJY"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Save As…" hidden="YES" keyEquivalent="S" id="Bw7-FT-i3A">
+                                        <menuItem title="Save As" keyEquivalent="S" id="Bw7-FT-i3A">
                                             <connections>
-                                                <action selector="saveDocumentAs:" target="Ady-hI-5gd" id="mDf-zr-I0C"/>
+                                                <action selector="saveEditedPhotoAs:" target="Voe-Tx-rLC" id="mDf-zr-I0C"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem title="Revert to Saved" hidden="YES" keyEquivalent="r" id="KaW-ft-85H">
@@ -143,14 +143,20 @@
                                 <modifierMask key="keyEquivalentModifierMask"/>
                                 <menu key="submenu" title="Edit" id="W48-6f-4Dl">
                                     <items>
-                                        <menuItem title="Undo" hidden="YES" keyEquivalent="z" id="dRJ-4n-Yzg">
+                                        <menuItem title="Undo" keyEquivalent="z" id="dRJ-4n-Yzg">
                                             <connections>
-                                                <action selector="undo:" target="Ady-hI-5gd" id="M6e-cu-g7V"/>
+                                                <action selector="undoPhotoCrop:" target="Voe-Tx-rLC" id="M6e-cu-g7V"/>
                                             </connections>
                                         </menuItem>
-                                        <menuItem title="Redo" hidden="YES" keyEquivalent="Z" id="6dh-zS-Vam">
+                                        <menuItem title="Redo" keyEquivalent="Z" id="6dh-zS-Vam">
                                             <connections>
-                                                <action selector="redo:" target="Ady-hI-5gd" id="oIA-Rs-6OD"/>
+                                                <action selector="redoPhotoCrop:" target="Voe-Tx-rLC" id="oIA-Rs-6OD"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Apply Crop" id="ce5-xR-f9P">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="applyPhotoCrop:" target="Voe-Tx-rLC" id="ce5-xR-f9Q"/>
                                             </connections>
                                         </menuItem>
                                         <menuItem title="Operation Logs" id="Mm8-sr-yAa">
@@ -691,6 +697,18 @@ Gw
                                             </connections>
                                         </menuItem>
                                         <menuItem isSeparatorItem="YES" id="hHG-It-Z2Z"/>
+                                        <menuItem title="Edit Photo" id="v2Q-hD-9Ce">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="openPhotoCropEditor:" target="Voe-Tx-rLC" id="v2Q-hD-9Cf"/>
+                                            </connections>
+                                        </menuItem>
+                                        <menuItem title="Find Similar Photos" id="y9s-aB-1Jc">
+                                            <modifierMask key="keyEquivalentModifierMask"/>
+                                            <connections>
+                                                <action selector="findSimilarPhotos:" target="Voe-Tx-rLC" id="q3A-HZ-KV7"/>
+                                            </connections>
+                                        </menuItem>
                                         <menuItem title="Show Finder Tags and Ratings" id="pB9-hf-avc">
                                             <modifierMask key="keyEquivalentModifierMask"/>
                                             <connections>

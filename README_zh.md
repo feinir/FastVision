@@ -19,12 +19,14 @@ FastVision 是 Fast 系列的 macOS 图片和视频浏览器，适合按文件�
 - 在瀑布流、网格和等高布局之间切换，或开启递归浏览，一次查看子文件夹里的媒体。
 - 把常用目录加入收藏夹，从侧栏进入个人主目录、已挂载磁盘和 Finder 标签。
 - 按文件名搜索，按 Finder 标签或评分筛选，或用多个标签页对照不同目录。
+- 从工具栏或照片右键菜单查找相似照片，跨组标记并核对清单，再将不需要的照片移到废纸篓。
+- 通过「编辑照片」打开独立编辑器，使用矩形裁剪、透视校正、旋转，以及可调整的图形、文字和画笔标注。编辑完成后可选择「保存」或「另存为」。
 - 放大查看图片细节，在支持的屏幕上查看 HDR 图片，并预览或播放视频。
 - 直接复制、移动和重命名文件，也可以在 Finder 里打开文件所在位置。
 
 ## 安装与使用
 
-FastVision 支持 **macOS 12 及以上**，可在 Apple Silicon 和 Intel Mac 上运行。从 [GitHub Releases](https://github.com/feinir/FastVision/releases) 下载已发布版本的 DMG，打开后把 FastVision 拖入「应用程序」。发布页也提供对应源码包和 SHA-256 校验文件。
+FastVision 支持 **macOS 12 及以上**，可在 Apple Silicon 和 Intel Mac 上运行。从 [GitHub Releases](https://github.com/feinir/FastVision/releases) 下载已发布版本的 DMG，打开后把 FastVision 拖入「应用程序」。发布页也提供对应源码（含依赖）以及 DMG 的 SHA-256 校验值。
 
 通过「文件 → 打开…」选择一个目录。双击缩略图打开预览，按方向键切换图片，按 **Esc** 返回缩略图，按 **⌘F** 搜索。
 

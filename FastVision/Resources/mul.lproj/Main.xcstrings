@@ -1,6 +1,28 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "ce5-xR-f9P.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apply Crop"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用裁剪"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "套用裁切"
+          }
+        }
+      }
+    },
     "1b7-l0-nxx.title" : {
       "comment" : "Class = \"NSMenu\"; title = \"Find\"; ObjectID = \"1b7-l0-nxx\";",
       "extractionState" : "extracted_with_value",
@@ -4322,109 +4344,109 @@
       }
     },
     "Bw7-FT-i3A.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"Save As…\"; ObjectID = \"Bw7-FT-i3A\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"Save As\"; ObjectID = \"Bw7-FT-i3A\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "حفظ باسم…"
+            "value" : "حفظ باسم"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Speichern unter…"
+            "value" : "Speichern unter"
           }
         },
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "Save As…"
+            "state" : "translated",
+            "value" : "Save As"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardar como…"
+            "value" : "Guardar como"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enregistrer sous…"
+            "value" : "Enregistrer sous"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salva come…"
+            "value" : "Salva come"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "名前を付けて保存…"
+            "value" : "名前を付けて保存"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다른 이름으로 저장… "
+            "value" : "다른 이름으로 저장"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Opslaan als…"
+            "value" : "Opslaan als"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zapisz jako…"
+            "value" : "Zapisz jako"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Salvar Como…"
+            "value" : "Salvar Como"
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Guardar Como…"
+            "value" : "Guardar Como"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Сохранить как…"
+            "value" : "Сохранить как"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spara som…"
+            "value" : "Spara som"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Farklı Kaydet…"
+            "value" : "Farklı Kaydet"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Save As…"
+            "value" : "另存为"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "另存為…"
+            "value" : "另存新檔"
           }
         }
       }
@@ -12745,6 +12767,42 @@
         }
       }
     },
+    "v2Q-hD-9Ce.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Edit Photo\"; ObjectID = \"v2Q-hD-9Ce\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑照片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編輯照片"
+          }
+        }
+      }
+    },
+    "y9s-aB-1Jc.title" : {
+      "comment" : "Class = \"NSMenuItem\"; title = \"Find Similar Photos\"; ObjectID = \"y9s-aB-1Jc\";",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查找相似照片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尋找相似照片"
+          }
+        }
+      }
+    },
     "pB9-hf-avc.title" : {
       "comment" : "Class = \"NSMenuItem\"; title = \"Show Finder Tags and Ratings\"; ObjectID = \"pB9-hf-avc\";",
       "extractionState" : "extracted_with_value",
@@ -12962,7 +13020,7 @@
       }
     },
     "pxx-59-PXV.title" : {
-      "comment" : "Class = \"NSMenuItem\"; title = \"Save…\"; ObjectID = \"pxx-59-PXV\";",
+      "comment" : "Class = \"NSMenuItem\"; title = \"Save\"; ObjectID = \"pxx-59-PXV\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
@@ -12979,8 +13037,8 @@
         },
         "en" : {
           "stringUnit" : {
-            "state" : "new",
-            "value" : "Save…"
+            "state" : "translated",
+            "value" : "Save"
           }
         },
         "es" : {
@@ -13058,13 +13116,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Save…"
+            "value" : "保存"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "儲存…"
+            "value" : "儲存"
           }
         }
       }

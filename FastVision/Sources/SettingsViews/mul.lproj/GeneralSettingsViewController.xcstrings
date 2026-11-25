@@ -326,109 +326,109 @@
       }
     },
     "BFV-85-Ue3.title" : {
-      "comment" : "Class = \"NSButtonCell\"; title = \"Select Folder...\"; ObjectID = \"BFV-85-Ue3\";",
+      "comment" : "Class = \"NSButtonCell\"; title = \"Select Folder\"; ObjectID = \"BFV-85-Ue3\";",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "حدد المجلد..."
+            "value" : "حدد المجلد"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ordner auswählen..."
+            "value" : "Ordner auswählen"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Select Folder..."
+            "value" : "Select Folder"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seleccionar carpeta..."
+            "value" : "Seleccionar carpeta"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sélectionner un dossier..."
+            "value" : "Sélectionner un dossier"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seleziona cartella..."
+            "value" : "Seleziona cartella"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "フォルダを選択…"
+            "value" : "フォルダを選択"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "폴더 선택..."
+            "value" : "폴더 선택"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Map selecteren..."
+            "value" : "Map selecteren"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wybierz folder..."
+            "value" : "Wybierz folder"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecionar Pasta..."
+            "value" : "Selecionar Pasta"
           }
         },
         "pt-PT" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Selecionar Pasta..."
+            "value" : "Selecionar Pasta"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите папку..."
+            "value" : "Выберите папку"
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Välj mapp..."
+            "value" : "Välj mapp"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Klasör Seç..."
+            "value" : "Klasör Seç"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择目录…"
+            "value" : "选择目录"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "選擇資料夾..."
+            "value" : "選擇資料夾"
           }
         }
       }

@@ -25,6 +25,11 @@
 		F73865E02C37C06C00837FE4 /* DataModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73865DF2C37C06C00837FE4 /* DataModel.swift */; };
 		F73865E22C37C0A300837FE4 /* Enum.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73865E12C37C0A300837FE4 /* Enum.swift */; };
 		F73865E42C37C11B00837FE4 /* ImageProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73865E32C37C11B00837FE4 /* ImageProcess.swift */; };
+		F7AC19007F90190000000004 /* SimilarPhotoScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000003 /* SimilarPhotoScanner.swift */; };
+		F7AC19007F90190000000008 /* PhotoCropProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000007 /* PhotoCropProcessor.swift */; };
+		F7AC19007F90190000000012 /* PhotoCropMesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000011 /* PhotoCropMesh.swift */; };
+		F7AC19007F90190000000014 /* PhotoAnnotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000013 /* PhotoAnnotation.swift */; };
+		F7AC19007F90190000000016 /* PhotoAnnotationOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000015 /* PhotoAnnotationOptions.swift */; };
 		F73865E62C37C1AA00837FE4 /* DrawingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73865E52C37C1AA00837FE4 /* DrawingView.swift */; };
 		F73865E82C37C26C00837FE4 /* FFmpegKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73865E72C37C26C00837FE4 /* FFmpegKit.swift */; };
 		F74636372C4F43AE0086E920 /* AdvancedSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F74636352C4F43AE0086E920 /* AdvancedSettingsViewController.swift */; };
@@ -49,6 +54,7 @@
 		F77098912F0E3C6B00E7D164 /* KeyShortcut.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77098902F0E3C6200E7D164 /* KeyShortcut.swift */; };
 		F77098932F0E411500E7D164 /* FileSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77098922F0E411200E7D164 /* FileSystem.swift */; };
 		F77098952F0E427800E7D164 /* FileOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77098942F0E427700E7D164 /* FileOperation.swift */; };
+		F7AC19007F90190000000002 /* SafeFileReplacement.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000001 /* SafeFileReplacement.swift */; };
 		F77098972F0E436800E7D164 /* LargeImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77098962F0E436600E7D164 /* LargeImage.swift */; };
 		F77098992F0E43E000E7D164 /* LayoutManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77098982F0E43DF00E7D164 /* LayoutManagement.swift */; };
 		F7790ECC2BA5CA9200406D35 /* WindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7790ECB2BA5CA9200406D35 /* WindowController.swift */; };
@@ -82,6 +88,8 @@
 		F7F600482E1E095500ED8536 /* FinderTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F600472E1E094A00ED8536 /* FinderTag.swift */; };
 		F7FAE0012F6BA00000FAE001 /* FavoritesPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FAE0002F6BA00000FAE000 /* FavoritesPopoverViewController.swift */; };
 		F7FAE1012F6BA00000FAE101 /* FileInfoWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FAE1002F6BA00000FAE100 /* FileInfoWindow.swift */; };
+		F7AC19007F90190000000006 /* SimilarPhotosViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000005 /* SimilarPhotosViewController.swift */; };
+		F7AC19007F90190000000010 /* PhotoCropWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000009 /* PhotoCropWindowController.swift */; };
 		F7FED5F32F7D0B1100E35164 /* Tagging.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FED5F22F7D0B0E00E35164 /* Tagging.swift */; };
 /* End PBXBuildFile section */
 
@@ -137,6 +145,11 @@
 		F73865DF2C37C06C00837FE4 /* DataModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataModel.swift; sourceTree = "<group>"; };
 		F73865E12C37C0A300837FE4 /* Enum.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Enum.swift; sourceTree = "<group>"; };
 		F73865E32C37C11B00837FE4 /* ImageProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageProcess.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000003 /* SimilarPhotoScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarPhotoScanner.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000007 /* PhotoCropProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCropProcessor.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000011 /* PhotoCropMesh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCropMesh.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000013 /* PhotoAnnotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAnnotation.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000015 /* PhotoAnnotationOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoAnnotationOptions.swift; sourceTree = "<group>"; };
 		F73865E52C37C1AA00837FE4 /* DrawingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawingView.swift; sourceTree = "<group>"; };
 		F73865E72C37C26C00837FE4 /* FFmpegKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FFmpegKit.swift; sourceTree = "<group>"; };
 		F74636352C4F43AE0086E920 /* AdvancedSettingsViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AdvancedSettingsViewController.swift; sourceTree = "<group>"; };
@@ -172,6 +185,7 @@
 		F77098902F0E3C6200E7D164 /* KeyShortcut.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyShortcut.swift; sourceTree = "<group>"; };
 		F77098922F0E411200E7D164 /* FileSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystem.swift; sourceTree = "<group>"; };
 		F77098942F0E427700E7D164 /* FileOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperation.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000001 /* SafeFileReplacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafeFileReplacement.swift; sourceTree = "<group>"; };
 		F77098962F0E436600E7D164 /* LargeImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LargeImage.swift; sourceTree = "<group>"; };
 		F77098982F0E43DF00E7D164 /* LayoutManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayoutManagement.swift; sourceTree = "<group>"; };
 		F7790ECB2BA5CA9200406D35 /* WindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowController.swift; sourceTree = "<group>"; };
@@ -200,6 +214,8 @@
 		F7F600472E1E094A00ED8536 /* FinderTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderTag.swift; sourceTree = "<group>"; };
 		F7FAE0002F6BA00000FAE000 /* FavoritesPopoverViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesPopoverViewController.swift; sourceTree = "<group>"; };
 		F7FAE1002F6BA00000FAE100 /* FileInfoWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInfoWindow.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000005 /* SimilarPhotosViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarPhotosViewController.swift; sourceTree = "<group>"; };
+		F7AC19007F90190000000009 /* PhotoCropWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCropWindowController.swift; sourceTree = "<group>"; };
 		F7FED5F22F7D0B0E00E35164 /* Tagging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tagging.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -228,6 +244,10 @@
 				F73865E72C37C26C00837FE4 /* FFmpegKit.swift */,
 				F7F600472E1E094A00ED8536 /* FinderTag.swift */,
 				F73865E32C37C11B00837FE4 /* ImageProcess.swift */,
+				F7AC19007F90190000000003 /* SimilarPhotoScanner.swift */,
+				F7AC19007F90190000000007 /* PhotoCropProcessor.swift */,
+				F7AC19007F90190000000011 /* PhotoCropMesh.swift */,
+				F7AC19007F90190000000013 /* PhotoAnnotation.swift */,
 				F76E2EFD2C3B765C0031B0B4 /* Log.swift */,
 				F73865DA2C37BC1500837FE4 /* RefCode.swift */,
 				F7AAA8BC2D9BD1ED007CE330 /* VideoProcess.swift */,
@@ -254,6 +274,9 @@
 				F73865E52C37C1AA00837FE4 /* DrawingView.swift */,
 				F7FAE0002F6BA00000FAE000 /* FavoritesPopoverViewController.swift */,
 				F7FAE1002F6BA00000FAE100 /* FileInfoWindow.swift */,
+				F7AC19007F90190000000005 /* SimilarPhotosViewController.swift */,
+				F7AC19007F90190000000009 /* PhotoCropWindowController.swift */,
+				F7AC19007F90190000000015 /* PhotoAnnotationOptions.swift */,
 				F78960F12BDCC26B00C2571B /* LargeImageView.swift */,
 				F73865D42C37B9B800837FE4 /* Layout.swift */,
 				F7AA00002F9E000000AA0001 /* VideoPlayerControlsView.swift */,
@@ -309,6 +332,7 @@
 				F74D554F2F0E467400C9AB85 /* DirTree.swift */,
 				F74D555B2F0E500C00C9AB85 /* EventHandler.swift */,
 				F77098942F0E427700E7D164 /* FileOperation.swift */,
+				F7AC19007F90190000000001 /* SafeFileReplacement.swift */,
 				F77098922F0E411200E7D164 /* FileSystem.swift */,
 				F77098902F0E3C6200E7D164 /* KeyShortcut.swift */,
 				F77098962F0E436600E7D164 /* LargeImage.swift */,
@@ -512,6 +536,11 @@
 				F73865D72C37BB2900837FE4 /* CustomOutlineView.swift in Sources */,
 				F72B1E762F713DA80056B19F /* TaggingSettingsViewController.swift in Sources */,
 				F73865E42C37C11B00837FE4 /* ImageProcess.swift in Sources */,
+				F7AC19007F90190000000004 /* SimilarPhotoScanner.swift in Sources */,
+				F7AC19007F90190000000008 /* PhotoCropProcessor.swift in Sources */,
+				F7AC19007F90190000000012 /* PhotoCropMesh.swift in Sources */,
+				F7AC19007F90190000000014 /* PhotoAnnotation.swift in Sources */,
+				F7AC19007F90190000000016 /* PhotoAnnotationOptions.swift in Sources */,
 				F74D55562F0E487C00C9AB85 /* RightMouseGesture.swift in Sources */,
 				F71DCEB92BD425D6006E5B1E /* CustomOutlineViewManager.swift in Sources */,
 				F7DECD6D2D00939300ECC099 /* CustomEffectView.swift in Sources */,
@@ -522,8 +551,11 @@
 				F70F9FC32BAFE85D00C50CDD /* CustomCollectionViewManager.swift in Sources */,
 				F7FAE0012F6BA00000FAE001 /* FavoritesPopoverViewController.swift in Sources */,
 				F7FAE1012F6BA00000FAE101 /* FileInfoWindow.swift in Sources */,
+				F7AC19007F90190000000006 /* SimilarPhotosViewController.swift in Sources */,
+				F7AC19007F90190000000010 /* PhotoCropWindowController.swift in Sources */,
 				F7A075542BA1D716009C47A6 /* AppDelegate.swift in Sources */,
 				F77098952F0E427800E7D164 /* FileOperation.swift in Sources */,
+				F7AC19007F90190000000002 /* SafeFileReplacement.swift in Sources */,
 				F74636552C5237720086E920 /* ActionsSettingsViewController.swift in Sources */,
 				F73865E22C37C0A300837FE4 /* Enum.swift in Sources */,
 				F73865E02C37C06C00837FE4 /* DataModel.swift in Sources */,
@@ -737,7 +769,7 @@
 				CODE_SIGN_ENTITLEMENTS = FastVision/FastVision.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20261125.1;
+				CURRENT_PROJECT_VERSION = 20261125.12;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FastVision/Info.plist;
@@ -752,7 +784,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.9;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision.debug;
 				PRODUCT_MODULE_NAME = FastVision;
@@ -771,7 +803,7 @@
 				CODE_SIGN_ENTITLEMENTS = FastVision/FastVision.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20261125.1;
+				CURRENT_PROJECT_VERSION = 20261125.12;
 
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -787,7 +819,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.9;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision;
 				PRODUCT_MODULE_NAME = FastVision;

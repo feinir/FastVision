@@ -114,7 +114,7 @@ class WindowController: NSWindowController, NSWindowDelegate {
         
         globalVar.windowNum -= 1
         log("Window closed, remain: " + String(globalVar.windowNum))
-        if globalVar.windowNum == 0 && globalVar.terminateAfterLastWindowClosed {
+        if globalVar.windowNum == 0 && globalVar.terminateAfterLastWindowClosed && !PhotoCropWindowController.hasOpenEditors {
             // 不这样会导致windowWillClose被调用两遍
             // Not doing this will cause windowWillClose to be called twice
             DispatchQueue.main.async {
@@ -312,6 +312,8 @@ extension NSToolbarItem.Identifier {
     static let more = NSToolbarItem.Identifier("com.example.more")
     static let favorites = NSToolbarItem.Identifier("com.example.favorites")
     static let tagging = NSToolbarItem.Identifier("com.example.tagging")
+    static let similarPhotos = NSToolbarItem.Identifier("com.fastvision.similarPhotos")
+    static let photoEditor = NSToolbarItem.Identifier("com.fastvision.photoEditor")
     static let thumbSize = NSToolbarItem.Identifier("com.example.thumbSize")
     static let isRecursiveMode = NSToolbarItem.Identifier("com.example.isRecursiveMode")
     static let isSearchFilterOn = NSToolbarItem.Identifier("com.example.isSearchFilterOn")
@@ -351,6 +353,7 @@ extension WindowController: NSToolbarDelegate {
                 if viewController.largeImageView.file.type == .image {
                     identifiers.append(.zoomOut)
                     identifiers.append(.zoomIn)
+                    identifiers.append(.photoEditor)
                 }
                 // identifiers.append(.rotateL)
                 identifiers.append(.rotateR)
@@ -381,10 +384,13 @@ extension WindowController: NSToolbarDelegate {
                 if viewController.publicVar.isRecursiveMode {
                     identifiers.append(.isRecursiveMode)
                 }
-                identifiers.append(.tagging)
-                identifiers.append(.viewToggle)
-                identifiers.append(.thumbSize)
-                identifiers.append(.sort)
+                identifiers.append(.similarPhotos)
+                if viewController.similarPhotosViewController == nil {
+                    identifiers.append(.tagging)
+                    identifiers.append(.viewToggle)
+                    identifiers.append(.thumbSize)
+                    identifiers.append(.sort)
+                }
             }
         }
         
@@ -669,6 +675,23 @@ extension WindowController: NSToolbarDelegate {
             toolbarItem.paletteLabel = NSLocalizedString("up-folder", comment: "上层文件夹")
             toolbarItem.visibilityPriority = .low
 
+        case .similarPhotos, .photoEditor:
+            let similar = itemIdentifier == .similarPhotos
+            let active = similar && viewController.similarPhotosViewController != nil
+            let label = similar
+                ? NSLocalizedString("similar-photo-action", value: "Find Similar Photos", comment: "")
+                : NSLocalizedString("photo-editor-open", value: "Edit Photo", comment: "")
+            let button = NSButton(title: "", target: self, action: similar
+                                  ? #selector(toggleSimilarPhotoReview(_:)) : #selector(openCropEditor(_:)))
+            button.image = NSImage(systemSymbolName: similar ? "photo.on.rectangle.angled" : PhotoCropWindowController.editorSymbol, accessibilityDescription: label)
+            setButtonStyle(button)
+            button.setAccessibilityLabel(label)
+            button.toolTip = active ? NSLocalizedString("similar-review-back", value: "Back to Browser", comment: "") : label
+            if active { button.contentTintColor = .controlAccentColor }
+            toolbarItem.view = button
+            toolbarItem.label = label
+            toolbarItem.paletteLabel = label
+            toolbarItem.visibilityPriority = .high
         case .tagging:
             let hasFilter = !viewController.publicVar.finderTagFilters.isEmpty || !viewController.publicVar.ratingFilters.isEmpty
             let symbolName = hasFilter ? "tag.fill" : "tag"
@@ -1479,6 +1502,16 @@ extension WindowController: NSToolbarDelegate {
         viewController.changeThumbSize(thumbSize: thumbSize)
     }
     
+    @objc private func toggleSimilarPhotoReview(_ sender: Any?) {
+        guard let browser = contentViewController as? ViewController else { return }
+        if let review = browser.similarPhotosViewController { review.requestClose() }
+        else { browser.showSimilarPhotos(sender) }
+    }
+
+    @objc private func openCropEditor(_ sender: Any?) {
+        (contentViewController as? ViewController)?.showPhotoEditor(sender)
+    }
+
     @objc func showMoreMenu(_ sender: Any?) {
         guard let viewController = contentViewController as? ViewController else {return}
         
@@ -1504,6 +1537,12 @@ extension WindowController: NSToolbarDelegate {
             
             let customLayoutStyle = menu.addItem(withTitle: NSLocalizedString("Custom Layout Style...", comment: "自定义布局样式..."), action: #selector(customLayoutStyle), keyEquivalent: "")
             customLayoutStyle.isEnabled = !viewController.publicVar.isInLargeView
+
+            let similarPhotos = menu.addItem(
+                withTitle: NSLocalizedString("similar-photo-action", value: "Find Similar Photos", comment: ""),
+                action: #selector(ViewController.showSimilarPhotos(_:)), keyEquivalent: ""
+            )
+            similarPhotos.target = viewController
             
             menu.addItem(NSMenuItem.separator())
             

@@ -1150,6 +1150,15 @@ class CustomCollectionViewItem: NSCollectionViewItem {
 
                 menu.addItem(NSMenuItem.separator())
                 
+                if file.type == .image, let url = URL(string: file.path), url.isFileURL {
+                    let similar = menu.addItem(withTitle: NSLocalizedString("similar-photo-action", value: "Find Similar Photos", comment: ""),
+                                              action: #selector(ViewController.showSimilarPhotos(_:)), keyEquivalent: "")
+                    similar.target = viewController
+                    similar.representedObject = url
+                    menu.addItem(NSMenuItem.separator())
+                    viewController.addPhotoEditorItem(to: menu, for: url)
+                }
+
                 addOpenWithSubMenu(to: menu)
                 
                 menu.addItem(withTitle: NSLocalizedString("Show in Finder", comment: "在Finder中显示"), action: #selector(actShowInFinder), keyEquivalent: "")
@@ -1249,7 +1258,9 @@ class CustomCollectionViewItem: NSCollectionViewItem {
                 let actionItemRefresh = menu.addItem(withTitle: NSLocalizedString("Refresh", comment: "刷新"), action: #selector(actRefresh), keyEquivalent: "r")
                 actionItemRefresh.keyEquivalentModifierMask = [.command]
                 
-                menu.items.forEach { $0.target = self }
+                for item in menu.items where item.target == nil && item.action != nil {
+                    item.target = self
+                }
                 NSMenu.popUpContextMenu(menu, with: event, for: self.view)
             }
         }
