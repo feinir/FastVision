@@ -6761,6 +6761,23 @@
         }
       }
     },
+    "Back 11 Images" : {
+      "comment" : "Accessible label and tooltip for the single-image viewer's backward navigation button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向前跳 11 张"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "往前跳 11 張"
+          }
+        }
+      }
+    },
     "Border Thickness" : {
       "comment" : "边框厚度",
       "localizations" : {
@@ -24643,6 +24660,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上級的下個同級目錄"
+          }
+        }
+      }
+    },
+    "Next Image" : {
+      "comment" : "Accessible label and tooltip for the single-image viewer's forward navigation button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一张"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一張"
           }
         }
       }

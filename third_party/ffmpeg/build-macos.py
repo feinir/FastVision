@@ -58,12 +58,26 @@ def verify_lgpl_frameworks(frameworks):
     required = (
         "--disable-gpl", "--disable-nonfree", "--enable-version3",
         "--enable-videotoolbox", "--enable-shared", "--disable-static",
+        "--disable-network", "--disable-demuxer=aa",
     )
     forbidden = (
         "--enable-gpl", "--enable-nonfree", "--enable-libx264",
         "--enable-libx265", "--enable-libxvid", "--enable-libvidstab",
     )
+    retired_ciphers = ("blowfish", "camellia", "cast5", "des", "rc4", "tea", "twofish", "xtea")
+    legacy_prefixes = tuple(f"_av_{cipher}_" for cipher in retired_ciphers)
+    media_binaries = tuple(
+        bundle / bundle.stem for bundle in frameworks.glob("libav*.xcframework/*/*.framework")
+    )
     for arch in ("arm64", "x86_64"):
+        for binary in media_binaries:
+            symbols = subprocess.check_output(
+                ["xcrun", "nm", "-arch", arch, "-gU", str(binary)],
+                text=True, errors="replace",
+            )
+            if any(line.split()[-1].startswith(legacy_prefixes)
+                   for line in symbols.splitlines() if line.strip()):
+                raise SystemExit(f"Unexpected legacy media cipher in {binary.name} ({arch}).")
         strings = subprocess.check_output(
             ["xcrun", "strings", "-arch", arch, "-a", str(libraries[0])],
             text=True, errors="replace",
@@ -119,7 +133,7 @@ def main():
             path.chmod(0o755)
 
     patches = sorted((supply / "patches").glob("*.patch"))
-    patches = [patch for patch in patches if patch.name.startswith(("0006-", "0007-", "0008-"))]
+    patches = [patch for patch in patches if patch.name.startswith(("0006-", "0007-", "0008-", "0009-"))]
     for patch in patches:
         with patch.open("rb") as data:
             subprocess.run(["patch", "-p1", "-f"], cwd=build, stdin=data, check=True)

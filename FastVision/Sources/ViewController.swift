@@ -340,6 +340,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
     var outlineViewManager: CustomOutlineViewManager!
     
     var snapshotQueue = [NSView?]()
+    var pendingThumbnailRefreshScrollOrigin: NSPoint?
     
     var initialPoint: NSPoint?
     var drawingView: DrawingView?
@@ -1338,6 +1339,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                         fileDB.lock()
                         var imageInfo = file.imageInfo
                         var originalSize = file.originalSize
+                        var isGetImageSizeFail = originalSize != nil && file.isGetImageSizeFail
                         let curFolder=fileDB.curFolder
                         fileDB.unlock() 
                         
@@ -1350,8 +1352,6 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                         defer {
                             publicVar.isInStageTwoProgress = false
                         }
-                        
-                        var isGetImageSizeFail = false
                         
                         if originalSize == nil {
                             // 获取图像大小
@@ -1376,30 +1376,27 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                 guard let self = self else { return }
                                 
                                 fileDB.lock()
+                                guard ver == dirModel.ver else {
+                                    fileDB.unlock()
+                                    return
+                                }
                                 file.imageInfo = imageInfo
                                 file.originalSize = originalSize
                                 file.canBeCalcued=true
                                 file.isGetImageSizeFail=isGetImageSizeFail
                                 let count=dirModel.files.count
+                                let layoutIsComplete = dirModel.layoutCalcPos == count
                                 let curFolder=fileDB.curFolder
                                 let keepScrollPos=dirModel.keepScrollPos
                                 fileDB.unlock()
                                 
-                                if ver != dirModel.ver {return}
-                                
                                 // 80~0.07s, 50~0.05s, 20~0.04s
-                                if(false || i % 20 == 8 || i == count-1 || publicVar.timer.intervalSafe(name: "recalcLayoutWhenReadInfo", second: 0.1)){
+                                if !layoutIsComplete && (i % 20 == 8 || i == count-1 || publicVar.timer.intervalSafe(name: "recalcLayoutWhenReadInfo", second: 0.1)) {
                                     recalcLayout(dir)
-                                    // collectionView.reloadData()
                                 }
                                 
-                                if(dir == curFolder && keepScrollPos && i == count-1){
-                                    // publicVar.timer.intervalSafe(name: "recalcLayoutReloadData", second: 0.02+Double(i)*0.0001)
-                                    let savedSelection = collectionView.selectionIndexPaths
-                                    collectionView.reloadData()
-                                    collectionView.selectionIndexPaths = savedSelection
-                                    collectionView.numberOfItems(inSection:0)
-                                    setProgress(1.0)
+                                if dir == curFolder && i == count-1 {
+                                    publishThumbnailRefresh()
                                 }
                                 
                                 fileDB.lock()
@@ -1738,21 +1735,23 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                         guard let self = self else { return }
                                         
                                         fileDB.lock()
-                                        let curFolder=fileDB.curFolder
-                                        fileDB.unlock() 
-                                        
-                                        if ver != dirModel.ver {return}
-                                        
-                                        fileDB.lock()
+                                        guard ver == dirModel.ver else {
+                                            fileDB.unlock()
+                                            return
+                                        }
+                                        let curFolder = fileDB.curFolder
+                                        let currentItemIndex = file.id
                                         file.image=image
                                         file.getThumbFailed=getThumbFailed
                                         file.folderImages=folderImages
                                         fileDB.unlock()
                                         // 此处必须分开加锁解锁，因为下面这句调用底层会重入锁
                                         // Must lock/unlock separately here, as call below will re-enter lock
-                                        if dir == curFolder {
-                                            let indexPath = IndexPath(item: i, section: 0)
-                                            if let item = collectionView.item(at: indexPath) as? CustomCollectionViewItem{
+                                        if dir == curFolder && currentItemIndex >= 0 {
+                                            let indexPath = IndexPath(item: currentItemIndex, section: 0)
+                                            // A refresh can move a file to a different item view.
+                                            if let item = collectionView.item(at: indexPath) as? CustomCollectionViewItem,
+                                               item.file === file {
                                                 fileDB.lock()
                                                 item.configureWithImage(file,playAnimation:true)
                                                 // log(i)

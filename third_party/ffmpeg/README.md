@@ -7,6 +7,10 @@ The native FFmpegKit 6.0 commit is `d6be56d7aec286eb3c292d6b23ff07a6b70d8693` an
 
 The shared [macOS build options](macos-lgpl.args) disable GPL and nonfree components and enable
 VideoToolbox for H.264 and HEVC. The BSD-licensed dav1d and libvpx are included.
+The frameworks use local-file media access. The build excludes network protocols,
+Audible AA and AAX decryption, encrypted ASF and OpenMG, and the retired ciphers they used.
+Unencrypted ASF and OpenMG remain readable. Standard AES support for interoperable media
+encryption, including MP4 Common Encryption, remains available.
 GNU config and gas-preprocessor are build tools. They are not linked into the frameworks.
 
 ## Build the frameworks on macOS

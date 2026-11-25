@@ -302,7 +302,7 @@ extension ViewController {
         }
     }
     
-    func locateLargeImage(direction: Int, isShowReachEndPrompt: Bool = true, firstShowThumb: Bool = true, noLoopBrowsing: Bool = false){
+    func locateLargeImage(direction: Int, steps: Int = 1, isShowReachEndPrompt: Bool = true, firstShowThumb: Bool = true, noLoopBrowsing: Bool = false){
         if largeImageView.isHidden {return}
         if publicVar.openFromFinderPath != "" {return}
         if currLargeImagePos == -1 {
@@ -311,61 +311,52 @@ extension ViewController {
         
         fileDB.lock()
         let curFolder=fileDB.curFolder
-        let totalCount = fileDB.db[SortKeyDir(curFolder)]!.files.count
-        let fileCount = fileDB.db[SortKeyDir(curFolder)]!.fileCount
-        var nextLargeImagePos=currLargeImagePos
-        var ifFoundNextImage=false
-        // 向前
-        // Forward
-        if direction == -1 {
-            while nextLargeImagePos >= 0 {
-                nextLargeImagePos-=1
-                if let file = fileDB.db[SortKeyDir(curFolder)]!.files.elementSafe(atOffset: nextLargeImagePos)?.1,
-                   file.type == .image || (file.type == .video && globalVar.useInternalPlayer) {
-                    ifFoundNextImage=true
-                    break
-                }
+        guard let files = fileDB.db[SortKeyDir(curFolder)]?.files else {
+            fileDB.unlock()
+            return
+        }
+        let increment: Int
+        var candidate: Int
+        var remainingSteps = 1
+        var canWrap = false
+        switch direction {
+        case -1, 1:
+            increment = direction
+            candidate = min(currLargeImagePos, files.count)
+            remainingSteps = steps
+            canWrap = globalVar.loopBrowsing && !noLoopBrowsing
+        case -2:
+            increment = 1
+            candidate = -1
+        case 2:
+            increment = -1
+            candidate = files.count
+        default:
+            fileDB.unlock()
+            return
+        }
+
+        var nextLargeImagePos: Int?
+        var skippedFiles = 0
+        while remainingSteps > 0 && skippedFiles < files.count {
+            candidate += increment
+            if !(0..<files.count).contains(candidate) {
+                guard canWrap else { break }
+                candidate = increment < 0 ? files.count - 1 : 0
             }
-        // 向后
-        // Backward
-        }else if direction == 1 {
-            while nextLargeImagePos < totalCount-1 {
-                nextLargeImagePos+=1
-                if let file = fileDB.db[SortKeyDir(curFolder)]!.files.elementSafe(atOffset: nextLargeImagePos)?.1,
-                   file.type == .image || (file.type == .video && globalVar.useInternalPlayer) {
-                    ifFoundNextImage=true
-                    break
-                }
-            }
-        // 第一张
-        // First image
-        }else if direction == -2 {
-            nextLargeImagePos = -1
-            while nextLargeImagePos < totalCount-1 {
-                nextLargeImagePos+=1
-                if let file = fileDB.db[SortKeyDir(curFolder)]!.files.elementSafe(atOffset: nextLargeImagePos)?.1,
-                   file.type == .image || (file.type == .video && globalVar.useInternalPlayer) {
-                    ifFoundNextImage=true
-                    break
-                }
-            }
-        // 最后一张
-        // Last image
-        }else if direction == 2 {
-            nextLargeImagePos = totalCount
-            while nextLargeImagePos >= 0 {
-                nextLargeImagePos-=1
-                if let file = fileDB.db[SortKeyDir(curFolder)]!.files.elementSafe(atOffset: nextLargeImagePos)?.1,
-                   file.type == .image || (file.type == .video && globalVar.useInternalPlayer) {
-                    ifFoundNextImage=true
-                    break
-                }
+            if let file = files.elementSafe(atOffset: candidate)?.1,
+               file.type == .image || (file.type == .video && globalVar.useInternalPlayer) {
+                nextLargeImagePos = candidate
+                remainingSteps -= 1
+                skippedFiles = 0
+            } else {
+                skippedFiles += 1
             }
         }
         
         fileDB.unlock()
         
-        if ifFoundNextImage {
+        if let nextLargeImagePos {
             // 复原之前图片的旋转
             // Restore the rotation of the previous image
             largeImageView.file.rotate=0
@@ -405,25 +396,17 @@ extension ViewController {
                 collectionView.selectItems(at: [indexPath], scrollPosition: [])
                 collectionView.delegate?.collectionView?(collectionView, didSelectItemsAt: [indexPath])
             }
-        }else {
+        } else if isShowReachEndPrompt {
             if direction == -1 {
-                if globalVar.loopBrowsing && !noLoopBrowsing {
-                    locateLargeImage(direction: 2, isShowReachEndPrompt: isShowReachEndPrompt, firstShowThumb: firstShowThumb)
-                } else if isShowReachEndPrompt {
-                    largeImageView.showInfo(NSLocalizedString("Have Reached the First", comment: "已经是第一张图片"))
-                }
-            }else if direction == 1 {
-                if globalVar.loopBrowsing && !noLoopBrowsing {
-                    locateLargeImage(direction: -2, isShowReachEndPrompt: isShowReachEndPrompt, firstShowThumb: firstShowThumb)
-                }else if isShowReachEndPrompt {
-                    largeImageView.showInfo(NSLocalizedString("Have Reached the Last", comment: "已经是最后一张图片"))
-                }
+                largeImageView.showInfo(NSLocalizedString("Have Reached the First", comment: "已经是第一张图片"))
+            } else if direction == 1 {
+                largeImageView.showInfo(NSLocalizedString("Have Reached the Last", comment: "已经是最后一张图片"))
             }
         }
     }
     
-    func previousLargeImage(isShowReachEndPrompt: Bool = true, firstShowThumb: Bool = true, noLoopBrowsing: Bool = false){
-        locateLargeImage(direction: -1, isShowReachEndPrompt: isShowReachEndPrompt, firstShowThumb: firstShowThumb, noLoopBrowsing: noLoopBrowsing)
+    func previousLargeImage(steps: Int = 1, isShowReachEndPrompt: Bool = true, firstShowThumb: Bool = true, noLoopBrowsing: Bool = false){
+        locateLargeImage(direction: -1, steps: steps, isShowReachEndPrompt: isShowReachEndPrompt, firstShowThumb: firstShowThumb, noLoopBrowsing: noLoopBrowsing)
     }
     
     func nextLargeImage(isShowReachEndPrompt: Bool = true, firstShowThumb: Bool = true, noLoopBrowsing: Bool = false){

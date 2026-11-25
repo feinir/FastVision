@@ -1,0 +1,749 @@
+--- a/scripts/apple/ffmpeg.sh
++++ b/scripts/apple/ffmpeg.sh
+@@ -415,4 +415,7 @@
+   CONFIGURE_POSTFIX+=" --disable-gpl --disable-nonfree"
+ fi
++
++# FastVision reads local media. Exclude network protocols and Audible AA.
++CONFIGURE_POSTFIX+=" --disable-network --disable-demuxer=aa"
+ 
+ # ALWAYS BUILD SHARED LIBRARIES
+--- a/src/ffmpeg/libavutil/Makefile
++++ b/src/ffmpeg/libavutil/Makefile
+@@ -12,10 +12,7 @@
+           avutil.h                                                      \
+           base64.h                                                      \
+-          blowfish.h                                                    \
+           bprint.h                                                      \
+           bswap.h                                                       \
+           buffer.h                                                      \
+-          cast5.h                                                       \
+-          camellia.h                                                    \
+           channel_layout.h                                              \
+           common.h                                                      \
+@@ -23,5 +20,4 @@
+           crc.h                                                         \
+           csp.h                                                         \
+-          des.h                                                         \
+           detection_bbox.h                                              \
+           dict.h                                                        \
+@@ -70,5 +66,4 @@
+           pixfmt.h                                                      \
+           random_seed.h                                                 \
+-          rc4.h                                                         \
+           rational.h                                                    \
+           replaygain.h                                                  \
+@@ -84,10 +79,7 @@
+           timestamp.h                                                   \
+           tree.h                                                        \
+-          twofish.h                                                     \
+           uuid.h                                                        \
+           version.h                                                     \
+           video_enc_params.h                                            \
+-          xtea.h                                                        \
+-          tea.h                                                         \
+           tx.h                                                          \
+           film_grain_params.h                                           \
+@@ -109,14 +101,10 @@
+        avsscanf.o                                                       \
+        base64.o                                                         \
+-       blowfish.o                                                       \
+        bprint.o                                                         \
+        buffer.o                                                         \
+-       cast5.o                                                          \
+-       camellia.o                                                       \
+        channel_layout.o                                                 \
+        cpu.o                                                            \
+        crc.o                                                            \
+        csp.o                                                            \
+-       des.o                                                            \
+        detection_bbox.o                                                 \
+        dict.o                                                           \
+@@ -158,5 +146,4 @@
+        rational.o                                                       \
+        reverse.o                                                        \
+-       rc4.o                                                            \
+        ripemd.o                                                         \
+        samplefmt.o                                                      \
+@@ -170,9 +157,6 @@
+        timecode.o                                                       \
+        tree.o                                                           \
+-       twofish.o                                                        \
+        utils.o                                                          \
+        xga_font_data.o                                                  \
+-       xtea.o                                                           \
+-       tea.o                                                            \
+        tx.o                                                             \
+        tx_float.o                                                       \
+--- a/src/ffmpeg/libavformat/Makefile
++++ b/src/ffmpeg/libavformat/Makefile
+@@ -119,7 +119,7 @@
+ OBJS-$(CONFIG_ARGO_CVG_DEMUXER)          += argo_cvg.o
+ OBJS-$(CONFIG_ARGO_CVG_MUXER)            += argo_cvg.o
+-OBJS-$(CONFIG_ASF_DEMUXER)               += asfdec_f.o asf.o asfcrypt.o \
++OBJS-$(CONFIG_ASF_DEMUXER)               += asfdec_f.o asf.o           \
+                                             asf_tags.o avlanguage.o
+-OBJS-$(CONFIG_ASF_O_DEMUXER)             += asfdec_o.o asf.o asfcrypt.o \
++OBJS-$(CONFIG_ASF_O_DEMUXER)             += asfdec_o.o asf.o           \
+                                             asf_tags.o avlanguage.o
+ OBJS-$(CONFIG_ASF_MUXER)                 += asfenc.o asf.o avlanguage.o
+--- a/src/ffmpeg/libavformat/asfdec_f.c
++++ b/src/ffmpeg/libavformat/asfdec_f.c
+@@ -38,5 +38,4 @@
+ #include "riff.h"
+ #include "asf.h"
+-#include "asfcrypt.h"
+ 
+ typedef struct ASFPayload {
+@@ -754,41 +753,10 @@
+         } else if (avio_feof(pb)) {
+             return AVERROR_EOF;
+-        } else {
+-            if (!s->keylen) {
+-                if (!ff_guidcmp(&g, &ff_asf_content_encryption)) {
+-                    AVPacket *const pkt = ffformatcontext(s)->parse_pkt;
+-                    unsigned int len;
+-                    av_log(s, AV_LOG_WARNING,
+-                           "DRM protected stream detected, decoding will likely fail!\n");
+-                    len= avio_rl32(pb);
+-                    av_log(s, AV_LOG_DEBUG, "Secret data:\n");
+-
+-                    if ((ret = av_get_packet(pb, pkt, len)) < 0)
+-                        return ret;
+-                    av_hex_dump_log(s, AV_LOG_DEBUG, pkt->data, pkt->size);
+-                    av_packet_unref(pkt);
+-
+-                    len= avio_rl32(pb);
+-                    if (len > UINT16_MAX)
+-                        return AVERROR_INVALIDDATA;
+-                    get_tag(s, "ASF_Protection_Type", -1, len, 32);
+-
+-                    len= avio_rl32(pb);
+-                    if (len > UINT16_MAX)
+-                        return AVERROR_INVALIDDATA;
+-                    get_tag(s, "ASF_Key_ID", -1, len, 32);
+-
+-                    len= avio_rl32(pb);
+-                    if (len > UINT16_MAX)
+-                        return AVERROR_INVALIDDATA;
+-                    get_tag(s, "ASF_License_URL", -1, len, 32);
+-                } else if (!ff_guidcmp(&g, &ff_asf_ext_content_encryption)) {
+-                    av_log(s, AV_LOG_WARNING,
+-                           "Ext DRM protected stream detected, decoding will likely fail!\n");
+-                    av_dict_set(&s->metadata, "encryption", "ASF Extended Content Encryption", 0);
+-                } else if (!ff_guidcmp(&g, &ff_asf_digital_signature)) {
+-                    av_log(s, AV_LOG_INFO, "Digital signature detected!\n");
+-                }
+-            }
++        } else if (!ff_guidcmp(&g, &ff_asf_content_encryption) ||
++                   !ff_guidcmp(&g, &ff_asf_ext_content_encryption)) {
++            av_log(s, AV_LOG_ERROR, "Encrypted ASF is unsupported\n");
++            return AVERROR(ENOSYS);
++        } else if (!ff_guidcmp(&g, &ff_asf_digital_signature)) {
++            av_log(s, AV_LOG_INFO, "Digital signature detected!\n");
+         }
+         if (ret < 0)
+@@ -1290,7 +1258,4 @@
+             }
+         }
+-        if (s->key && s->keylen == 20)
+-            ff_asfcrypt_dec(s->key, asf_st->pkt.data + asf->packet_frag_offset,
+-                            ret);
+         asf_st->frag_offset += ret;
+         /* test if whole packet is read */
+--- a/src/ffmpeg/libavformat/asfdec_o.c
++++ b/src/ffmpeg/libavformat/asfdec_o.c
+@@ -33,5 +33,4 @@
+ #include "riff.h"
+ #include "asf.h"
+-#include "asfcrypt.h"
+ 
+ #define ASF_BOOL                              0x2
+@@ -904,4 +903,10 @@
+ }
+ 
++static int asf_reject_encrypted(AVFormatContext *s, const GUIDParseTable *g)
++{
++    av_log(s, AV_LOG_ERROR, "Encrypted ASF is unsupported\n");
++    return AVERROR(ENOSYS);
++}
++
+ static const GUIDParseTable gdef[] = {
+     { "Data",                         { 0x75, 0xB2, 0x26, 0x36, 0x66, 0x8E, 0x11, 0xCF, 0xA6, 0xD9, 0x00, 0xAA, 0x00, 0x62, 0xCE, 0x6C }, asf_read_data, 1 },
+@@ -918,6 +923,6 @@
+     { "Language List",                { 0x7C, 0x43, 0x46, 0xa9, 0xef, 0xe0, 0x4B, 0xFC, 0xB2, 0x29, 0x39, 0x3e, 0xde, 0x41, 0x5c, 0x85 }, asf_read_language_list, 1},
+     { "Padding",                      { 0x18, 0x06, 0xD4, 0x74, 0xCA, 0xDF, 0x45, 0x09, 0xA4, 0xBA, 0x9A, 0xAB, 0xCB, 0x96, 0xAA, 0xE8 }, asf_read_unknown, 1 },
+-    { "DRMv1 Header",                 { 0x22, 0x11, 0xB3, 0xFB, 0xBD, 0x23, 0x11, 0xD2, 0xB4, 0xB7, 0x00, 0xA0, 0xC9, 0x55, 0xFC, 0x6E }, asf_read_unknown, 1 },
+-    { "DRMv2 Header",                 { 0x29, 0x8A, 0xE6, 0x14, 0x26, 0x22, 0x4C, 0x17, 0xB9, 0x35, 0xDA, 0xE0, 0x7E, 0xE9, 0x28, 0x9c }, asf_read_unknown, 1 },
++    { "DRMv1 Header",                 { 0x22, 0x11, 0xB3, 0xFB, 0xBD, 0x23, 0x11, 0xD2, 0xB4, 0xB7, 0x00, 0xA0, 0xC9, 0x55, 0xFC, 0x6E }, asf_reject_encrypted, 1 },
++    { "DRMv2 Header",                 { 0x29, 0x8A, 0xE6, 0x14, 0x26, 0x22, 0x4C, 0x17, 0xB9, 0x35, 0xDA, 0xE0, 0x7E, 0xE9, 0x28, 0x9c }, asf_reject_encrypted, 1 },
+     { "Index",                        { 0xD6, 0xE2, 0x29, 0xD3, 0x35, 0xDA, 0x11, 0xD1, 0x90, 0x34, 0x00, 0xA0, 0xC9, 0x03, 0x49, 0xBE }, asf_read_unknown, 1 },
+     { "Media Object Index",           { 0xFE, 0xB1, 0x03, 0xF8, 0x12, 0xAD, 0x4C, 0x64, 0x84, 0x0F, 0x2A, 0x1D, 0x2F, 0x7A, 0xD4, 0x8C }, asf_read_unknown, 1 },
+@@ -926,6 +931,6 @@
+     { "Error Correction",             { 0x75, 0xB2, 0x26, 0x35, 0x66, 0x8E, 0x11, 0xCF, 0xA6, 0xD9, 0x00, 0xAA, 0x00, 0x62, 0xCE, 0x6C }, asf_read_unknown, 1 },
+     { "Content Branding",             { 0x22, 0x11, 0xB3, 0xFA, 0xBD, 0x23, 0x11, 0xD2, 0xB4, 0xB7, 0x00, 0xA0, 0xC9, 0x55, 0xFC, 0x6E }, asf_read_unknown, 1 },
+-    { "Content Encryption",           { 0x22, 0x11, 0xB3, 0xFB, 0xBD, 0x23, 0x11, 0xD2, 0xB4, 0xB7, 0x00, 0xA0, 0xC9, 0x55, 0xFC, 0x6E }, asf_read_unknown, 1 },
+-    { "Extended Content Encryption",  { 0x29, 0x8A, 0xE6, 0x14, 0x26, 0x22, 0x4C, 0x17, 0xB9, 0x35, 0xDA, 0xE0, 0x7E, 0xE9, 0x28, 0x9C }, asf_read_unknown, 1 },
++    { "Content Encryption",           { 0x22, 0x11, 0xB3, 0xFB, 0xBD, 0x23, 0x11, 0xD2, 0xB4, 0xB7, 0x00, 0xA0, 0xC9, 0x55, 0xFC, 0x6E }, asf_reject_encrypted, 1 },
++    { "Extended Content Encryption",  { 0x29, 0x8A, 0xE6, 0x14, 0x26, 0x22, 0x4C, 0x17, 0xB9, 0x35, 0xDA, 0xE0, 0x7E, 0xE9, 0x28, 0x9C }, asf_reject_encrypted, 1 },
+     { "Digital Signature",            { 0x22, 0x11, 0xB3, 0xFC, 0xBD, 0x23, 0x11, 0xD2, 0xB4, 0xB7, 0x00, 0xA0, 0xC9, 0x55, 0xFC, 0x6E }, asf_read_unknown, 1 },
+     { "Extended Stream Properties",   { 0x14, 0xE6, 0xA5, 0xCB, 0xC6, 0x72, 0x43, 0x32, 0x83, 0x99, 0xA9, 0x69, 0x52, 0x06, 0x5B, 0x5A }, asf_read_ext_stream_properties, 1 },
+@@ -1094,6 +1099,4 @@
+         if ((ret = avio_read(pb, p, pay_len)) < 0)
+             return ret;
+-        if (s->key && s->keylen == 20)
+-            ff_asfcrypt_dec(s->key, p, ret);
+         avio_skip(pb, skip);
+         asf_pkt->size_left -= pay_len;
+@@ -1147,6 +1150,4 @@
+     if ((ret = avio_read(pb, p, size)) < 0)
+         return ret;
+-    if (s->key && s->keylen == 20)
+-            ff_asfcrypt_dec(s->key, p, ret);
+     if (asf->packet_size_internal)
+         avio_skip(pb, asf->packet_size - asf->packet_size_internal);
+--- a/src/ffmpeg/libavformat/omadec.c
++++ b/src/ffmpeg/libavformat/omadec.c
+@@ -47,5 +47,4 @@
+ #include "internal.h"
+ #include "libavutil/intreadwrite.h"
+-#include "libavutil/des.h"
+ #include "libavutil/mathematics.h"
+ #include "oma.h"
+@@ -53,10 +52,4 @@
+ #include "id3v2.h"
+ 
+-
+-static const uint64_t leaf_table[] = {
+-    0xd79e8283acea4620, 0x7a9762f445afd0d8,
+-    0x354d60a60b8c79f1, 0x584e1cde00b07aee,
+-    0x1573cd93da7df623, 0x47f98d79620dd535
+-};
+ 
+ /** map ATRAC-X channel id to internal channel layout */
+@@ -73,251 +66,7 @@
+ typedef struct OMAContext {
+     uint64_t content_start;
+-    int encrypted;
+-    uint16_t k_size;
+-    uint16_t e_size;
+-    uint16_t i_size;
+-    uint16_t s_size;
+-    uint32_t rid;
+-    uint8_t r_val[24];
+-    uint8_t n_val[24];
+-    uint8_t m_val[8];
+-    uint8_t s_val[8];
+-    uint8_t sm_val[8];
+-    uint8_t e_val[8];
+-    uint8_t iv[8];
+-    struct AVDES *av_des;
+ 
+     int (*read_packet)(AVFormatContext *s, AVPacket *pkt);
+ } OMAContext;
+-
+-static int oma_read_close(AVFormatContext *s)
+-{
+-    OMAContext *oc = s->priv_data;
+-    av_freep(&oc->av_des);
+-    return 0;
+-}
+-
+-static void hex_log(AVFormatContext *s, int level,
+-                    const char *name, const uint8_t *value, int len)
+-{
+-    char buf[33];
+-    len = FFMIN(len, 16);
+-    if (av_log_get_level() < level)
+-        return;
+-    ff_data_to_hex(buf, value, len, 1);
+-    av_log(s, level, "%s: %s\n", name, buf);
+-}
+-
+-static int kset(AVFormatContext *s, const uint8_t *r_val, const uint8_t *n_val,
+-                int len)
+-{
+-    OMAContext *oc = s->priv_data;
+-
+-    if (!r_val && !n_val)
+-        return -1;
+-
+-    len = FFMIN(len, 16);
+-
+-    /* use first 64 bits in the third round again */
+-    if (r_val) {
+-        if (r_val != oc->r_val) {
+-            memset(oc->r_val, 0, 24);
+-            memcpy(oc->r_val, r_val, len);
+-        }
+-        memcpy(&oc->r_val[16], r_val, 8);
+-    }
+-    if (n_val) {
+-        if (n_val != oc->n_val) {
+-            memset(oc->n_val, 0, 24);
+-            memcpy(oc->n_val, n_val, len);
+-        }
+-        memcpy(&oc->n_val[16], n_val, 8);
+-    }
+-
+-    return 0;
+-}
+-
+-#define OMA_RPROBE_M_VAL 48 + 1
+-
+-static int rprobe(AVFormatContext *s, uint8_t *enc_header, unsigned size,
+-                  const uint8_t *r_val)
+-{
+-    OMAContext *oc = s->priv_data;
+-    unsigned int pos;
+-    struct AVDES *av_des;
+-
+-    if (!enc_header || !r_val ||
+-        size < OMA_ENC_HEADER_SIZE + oc->k_size + oc->e_size + oc->i_size ||
+-        size < OMA_RPROBE_M_VAL)
+-        return -1;
+-
+-    av_des = av_des_alloc();
+-    if (!av_des)
+-        return AVERROR(ENOMEM);
+-
+-    /* m_val */
+-    av_des_init(av_des, r_val, 192, 1);
+-    av_des_crypt(av_des, oc->m_val, &enc_header[48], 1, NULL, 1);
+-
+-    /* s_val */
+-    av_des_init(av_des, oc->m_val, 64, 0);
+-    av_des_crypt(av_des, oc->s_val, NULL, 1, NULL, 0);
+-
+-    /* sm_val */
+-    pos = OMA_ENC_HEADER_SIZE + oc->k_size + oc->e_size;
+-    av_des_init(av_des, oc->s_val, 64, 0);
+-    av_des_mac(av_des, oc->sm_val, &enc_header[pos], (oc->i_size >> 3));
+-
+-    pos += oc->i_size;
+-
+-    av_free(av_des);
+-
+-    return memcmp(&enc_header[pos], oc->sm_val, 8) ? -1 : 0;
+-}
+-
+-static int nprobe(AVFormatContext *s, uint8_t *enc_header, unsigned size,
+-                  const uint8_t *n_val)
+-{
+-    OMAContext *oc = s->priv_data;
+-    uint64_t pos;
+-    uint32_t taglen, datalen;
+-    struct AVDES *av_des;
+-
+-    if (!enc_header || !n_val ||
+-        size < OMA_ENC_HEADER_SIZE + oc->k_size + 4)
+-        return -1;
+-
+-    pos = OMA_ENC_HEADER_SIZE + oc->k_size;
+-    if (!memcmp(&enc_header[pos], "EKB ", 4))
+-        pos += 32;
+-
+-    if (size < pos + 44)
+-        return -1;
+-
+-    if (AV_RB32(&enc_header[pos]) != oc->rid)
+-        av_log(s, AV_LOG_DEBUG, "Mismatching RID\n");
+-
+-    taglen  = AV_RB32(&enc_header[pos + 32]);
+-    datalen = AV_RB32(&enc_header[pos + 36]) >> 4;
+-
+-    pos += 44LL + taglen;
+-
+-    if (pos + (((uint64_t)datalen) << 4) > size)
+-        return -1;
+-
+-    av_des = av_des_alloc();
+-    if (!av_des)
+-        return AVERROR(ENOMEM);
+-
+-    av_des_init(av_des, n_val, 192, 1);
+-    while (datalen-- > 0) {
+-        av_des_crypt(av_des, oc->r_val, &enc_header[pos], 2, NULL, 1);
+-        kset(s, oc->r_val, NULL, 16);
+-        if (!rprobe(s, enc_header, size, oc->r_val)) {
+-            av_free(av_des);
+-            return 0;
+-        }
+-        pos += 16;
+-    }
+-
+-    av_free(av_des);
+-    return -1;
+-}
+-
+-static int decrypt_init(AVFormatContext *s, ID3v2ExtraMeta *em, uint8_t *header)
+-{
+-    OMAContext *oc = s->priv_data;
+-    ID3v2ExtraMetaGEOB *geob = NULL;
+-    uint8_t *gdata;
+-
+-    oc->encrypted = 1;
+-    av_log(s, AV_LOG_INFO, "File is encrypted\n");
+-
+-    /* find GEOB metadata */
+-    for (; em; em = em->next) {
+-        if (strcmp(em->tag, "GEOB"))
+-            continue;
+-        geob = &em->data.geob;
+-        if (!strcmp(geob->description, "OMG_LSI") ||
+-            !strcmp(geob->description, "OMG_BKLSI"))
+-            break;
+-    }
+-    if (!em) {
+-        av_log(s, AV_LOG_ERROR, "No encryption header found\n");
+-        return AVERROR_INVALIDDATA;
+-    }
+-
+-    if (geob->datasize < 64) {
+-        av_log(s, AV_LOG_ERROR,
+-               "Invalid GEOB data size: %"PRIu32"\n", geob->datasize);
+-        return AVERROR_INVALIDDATA;
+-    }
+-
+-    gdata = geob->data;
+-
+-    if (AV_RB16(gdata) != 1)
+-        av_log(s, AV_LOG_WARNING, "Unknown version in encryption header\n");
+-
+-    oc->k_size = AV_RB16(&gdata[2]);
+-    oc->e_size = AV_RB16(&gdata[4]);
+-    oc->i_size = AV_RB16(&gdata[6]);
+-    oc->s_size = AV_RB16(&gdata[8]);
+-
+-    if (memcmp(&gdata[OMA_ENC_HEADER_SIZE], "KEYRING     ", 12)) {
+-        av_log(s, AV_LOG_ERROR, "Invalid encryption header\n");
+-        return AVERROR_INVALIDDATA;
+-    }
+-    if (OMA_ENC_HEADER_SIZE + oc->k_size + oc->e_size + oc->i_size + 8 > geob->datasize ||
+-        OMA_ENC_HEADER_SIZE + 48 > geob->datasize) {
+-        av_log(s, AV_LOG_ERROR, "Too little GEOB data\n");
+-        return AVERROR_INVALIDDATA;
+-    }
+-    oc->rid = AV_RB32(&gdata[OMA_ENC_HEADER_SIZE + 28]);
+-    av_log(s, AV_LOG_DEBUG, "RID: %.8"PRIx32"\n", oc->rid);
+-
+-    memcpy(oc->iv, &header[0x58], 8);
+-    hex_log(s, AV_LOG_DEBUG, "IV", oc->iv, 8);
+-
+-    hex_log(s, AV_LOG_DEBUG, "CBC-MAC",
+-            &gdata[OMA_ENC_HEADER_SIZE + oc->k_size + oc->e_size + oc->i_size],
+-            8);
+-
+-    if (s->keylen > 0) {
+-        kset(s, s->key, s->key, s->keylen);
+-    }
+-    if (!memcmp(oc->r_val, (const uint8_t[8]){0}, 8) ||
+-        rprobe(s, gdata, geob->datasize, oc->r_val) < 0 &&
+-        nprobe(s, gdata, geob->datasize, oc->n_val) < 0) {
+-        int i;
+-        for (i = 0; i < FF_ARRAY_ELEMS(leaf_table); i += 2) {
+-            uint8_t buf[16];
+-            AV_WL64(buf,     leaf_table[i]);
+-            AV_WL64(&buf[8], leaf_table[i + 1]);
+-            kset(s, buf, buf, 16);
+-            if (!rprobe(s, gdata, geob->datasize, oc->r_val) ||
+-                !nprobe(s, gdata, geob->datasize, oc->n_val))
+-                break;
+-        }
+-        if (i >= FF_ARRAY_ELEMS(leaf_table)) {
+-            av_log(s, AV_LOG_ERROR, "Invalid key\n");
+-            return AVERROR_INVALIDDATA;
+-        }
+-    }
+-
+-    oc->av_des = av_des_alloc();
+-    if (!oc->av_des)
+-        return AVERROR(ENOMEM);
+-
+-    /* e_val */
+-    av_des_init(oc->av_des, oc->m_val, 64, 0);
+-    av_des_crypt(oc->av_des, oc->e_val,
+-                 &gdata[OMA_ENC_HEADER_SIZE + 40], 1, NULL, 0);
+-    hex_log(s, AV_LOG_DEBUG, "EK", oc->e_val, 8);
+-
+-    /* init e_val */
+-    av_des_init(oc->av_des, oc->e_val, 64, 1);
+-
+-    return 0;
+-}
+ 
+ static int read_packet(AVFormatContext *s, AVPacket *pkt)
+@@ -346,13 +95,4 @@
+     }
+ 
+-    if (oc->encrypted) {
+-        /* previous unencrypted block saved in IV for
+-         * the next packet (CBC mode) */
+-        if (ret == packet_size)
+-            av_des_crypt(oc->av_des, pkt->data, pkt->data,
+-                         (packet_size >> 3), oc->iv, 1);
+-        else
+-            memset(oc->iv, 0, 8);
+-    }
+ 
+     return ret;
+@@ -436,7 +176,8 @@
+     /* encrypted file */
+     eid = AV_RB16(&buf[6]);
+-    if (eid != -1 && eid != -128 && decrypt_init(s, extra_meta, buf) < 0) {
++    if (eid != -1 && eid != -128) {
++        av_log(s, AV_LOG_ERROR, "Encrypted OpenMG audio is unsupported\n");
+         ff_id3v2_free_extra_meta(&extra_meta);
+-        return -1;
++        return AVERROR(ENOSYS);
+     }
+ 
+@@ -579,7 +320,5 @@
+                          int stream_index, int64_t timestamp, int flags)
+ {
+-    OMAContext *oc = s->priv_data;
+     AVStream *st = s->streams[0];
+-    int64_t err;
+ 
+     if (st->codecpar->codec_id == AV_CODEC_ID_ATRAC3PAL ||
+@@ -587,23 +326,5 @@
+         return -1;
+ 
+-    err = ff_pcm_read_seek(s, stream_index, timestamp, flags);
+-    if (!oc->encrypted)
+-        return err;
+-
+-    /* readjust IV for CBC */
+-    if (err || avio_tell(s->pb) < oc->content_start)
+-        goto wipe;
+-    if ((err = avio_seek(s->pb, -8, SEEK_CUR)) < 0)
+-        goto wipe;
+-    if ((err = avio_read(s->pb, oc->iv, 8)) < 8) {
+-        if (err >= 0)
+-            err = AVERROR_EOF;
+-        goto wipe;
+-    }
+-
+-    return 0;
+-wipe:
+-    memset(oc->iv, 0, 8);
+-    return err;
++    return ff_pcm_read_seek(s, stream_index, timestamp, flags);
+ }
+ 
+@@ -617,5 +338,4 @@
+     .read_packet    = oma_read_packet,
+     .read_seek      = oma_read_seek,
+-    .read_close     = oma_read_close,
+     .flags          = AVFMT_GENERIC_INDEX,
+     .extensions     = "oma,omg,aa3",
+--- a/src/ffmpeg/libavformat/mov.c
++++ b/src/ffmpeg/libavformat/mov.c
+@@ -45,5 +45,4 @@
+ #include "libavutil/aes_ctr.h"
+ #include "libavutil/pixdesc.h"
+-#include "libavutil/sha.h"
+ #include "libavutil/spherical.h"
+ #include "libavutil/stereo3d.h"
+@@ -983,141 +982,8 @@
+ }
+ 
+-#define DRM_BLOB_SIZE 56
+-
+ static int mov_read_adrm(MOVContext *c, AVIOContext *pb, MOVAtom atom)
+ {
+-    uint8_t intermediate_key[20];
+-    uint8_t intermediate_iv[20];
+-    uint8_t input[64];
+-    uint8_t output[64];
+-    uint8_t file_checksum[20];
+-    uint8_t calculated_checksum[20];
+-    char checksum_string[2 * sizeof(file_checksum) + 1];
+-    struct AVSHA *sha;
+-    int i;
+-    int ret = 0;
+-    uint8_t *activation_bytes = c->activation_bytes;
+-    uint8_t *fixed_key = c->audible_fixed_key;
+-
+-    c->aax_mode = 1;
+-
+-    sha = av_sha_alloc();
+-    if (!sha)
+-        return AVERROR(ENOMEM);
+-    av_free(c->aes_decrypt);
+-    c->aes_decrypt = av_aes_alloc();
+-    if (!c->aes_decrypt) {
+-        ret = AVERROR(ENOMEM);
+-        goto fail;
+-    }
+-
+-    /* drm blob processing */
+-    avio_read(pb, output, 8); // go to offset 8, absolute position 0x251
+-    avio_read(pb, input, DRM_BLOB_SIZE);
+-    avio_read(pb, output, 4); // go to offset 4, absolute position 0x28d
+-    avio_read(pb, file_checksum, 20);
+-
+-    // required by external tools
+-    ff_data_to_hex(checksum_string, file_checksum, sizeof(file_checksum), 1);
+-    av_log(c->fc, AV_LOG_INFO, "[aax] file checksum == %s\n", checksum_string);
+-
+-    /* verify activation data */
+-    if (!activation_bytes) {
+-        av_log(c->fc, AV_LOG_WARNING, "[aax] activation_bytes option is missing!\n");
+-        ret = 0;  /* allow ffprobe to continue working on .aax files */
+-        goto fail;
+-    }
+-    if (c->activation_bytes_size != 4) {
+-        av_log(c->fc, AV_LOG_FATAL, "[aax] activation_bytes value needs to be 4 bytes!\n");
+-        ret = AVERROR(EINVAL);
+-        goto fail;
+-    }
+-
+-    /* verify fixed key */
+-    if (c->audible_fixed_key_size != 16) {
+-        av_log(c->fc, AV_LOG_FATAL, "[aax] audible_fixed_key value needs to be 16 bytes!\n");
+-        ret = AVERROR(EINVAL);
+-        goto fail;
+-    }
+-
+-    /* AAX (and AAX+) key derivation */
+-    av_sha_init(sha, 160);
+-    av_sha_update(sha, fixed_key, 16);
+-    av_sha_update(sha, activation_bytes, 4);
+-    av_sha_final(sha, intermediate_key);
+-    av_sha_init(sha, 160);
+-    av_sha_update(sha, fixed_key, 16);
+-    av_sha_update(sha, intermediate_key, 20);
+-    av_sha_update(sha, activation_bytes, 4);
+-    av_sha_final(sha, intermediate_iv);
+-    av_sha_init(sha, 160);
+-    av_sha_update(sha, intermediate_key, 16);
+-    av_sha_update(sha, intermediate_iv, 16);
+-    av_sha_final(sha, calculated_checksum);
+-    if (memcmp(calculated_checksum, file_checksum, 20)) { // critical error
+-        av_log(c->fc, AV_LOG_ERROR, "[aax] mismatch in checksums!\n");
+-        ret = AVERROR_INVALIDDATA;
+-        goto fail;
+-    }
+-    av_aes_init(c->aes_decrypt, intermediate_key, 128, 1);
+-    av_aes_crypt(c->aes_decrypt, output, input, DRM_BLOB_SIZE >> 4, intermediate_iv, 1);
+-    for (i = 0; i < 4; i++) {
+-        // file data (in output) is stored in big-endian mode
+-        if (activation_bytes[i] != output[3 - i]) { // critical error
+-            av_log(c->fc, AV_LOG_ERROR, "[aax] error in drm blob decryption!\n");
+-            ret = AVERROR_INVALIDDATA;
+-            goto fail;
+-        }
+-    }
+-    memcpy(c->file_key, output + 8, 16);
+-    memcpy(input, output + 26, 16);
+-    av_sha_init(sha, 160);
+-    av_sha_update(sha, input, 16);
+-    av_sha_update(sha, c->file_key, 16);
+-    av_sha_update(sha, fixed_key, 16);
+-    av_sha_final(sha, c->file_iv);
+-
+-fail:
+-    av_free(sha);
+-
+-    return ret;
+-}
+-
+-static int mov_aaxc_crypto(MOVContext *c)
+-{
+-    if (c->audible_key_size != 16) {
+-        av_log(c->fc, AV_LOG_FATAL, "[aaxc] audible_key value needs to be 16 bytes!\n");
+-        return AVERROR(EINVAL);
+-    }
+-
+-    if (c->audible_iv_size != 16) {
+-        av_log(c->fc, AV_LOG_FATAL, "[aaxc] audible_iv value needs to be 16 bytes!\n");
+-        return AVERROR(EINVAL);
+-    }
+-
+-    c->aes_decrypt = av_aes_alloc();
+-    if (!c->aes_decrypt) {
+-        return AVERROR(ENOMEM);
+-    }
+-
+-    memcpy(c->file_key, c->audible_key, 16);
+-    memcpy(c->file_iv, c->audible_iv, 16);
+-    c->aax_mode = 1;
+-
+-    return 0;
+-}
+-
+-// Audible AAX (and AAX+) bytestream decryption
+-static int aax_filter(uint8_t *input, int size, MOVContext *c)
+-{
+-    int blocks = 0;
+-    unsigned char iv[16];
+-
+-    memcpy(iv, c->file_iv, 16); // iv is overwritten
+-    blocks = size >> 4; // trailing bytes are not encrypted!
+-    av_aes_init(c->aes_decrypt, c->file_key, 128, 1);
+-    av_aes_crypt(c->aes_decrypt, input, input, blocks, iv, 1);
+-
+-    return 0;
++    av_log(c->fc, AV_LOG_ERROR, "Encrypted Audible media is unsupported\n");
++    return AVERROR(ENOSYS);
+ }
+ 
+@@ -1157,7 +1023,7 @@
+                 comp_brands_str, AV_DICT_DONT_STRDUP_VAL);
+ 
+-    // Logic for handling Audible's .aaxc files
+     if (!strcmp(type, "aaxc")) {
+-        mov_aaxc_crypto(c);
++        av_log(c->fc, AV_LOG_ERROR, "Encrypted Audible media is unsupported\n");
++        return AVERROR(ENOSYS);
+     }
+ 
+@@ -8290,5 +8156,4 @@
+     av_freep(&mov->frag_index.item);
+ 
+-    av_freep(&mov->aes_decrypt);
+     av_freep(&mov->chapter_tracks);
+     av_freep(&mov->avif_info);
+@@ -8890,7 +8755,4 @@
+         }
+     }
+-
+-    if (mov->aax_mode)
+-        aax_filter(pkt->data, pkt->size, mov);
+ 
+     ret = cenc_filter(mov, st, sc, pkt, current_index);
+@@ -9135,14 +8997,4 @@
+     { "export_xmp", "Export full XMP metadata", OFFSET(export_xmp),
+         AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, .flags = FLAGS },
+-    { "activation_bytes", "Secret bytes for Audible AAX files", OFFSET(activation_bytes),
+-        AV_OPT_TYPE_BINARY, .flags = AV_OPT_FLAG_DECODING_PARAM },
+-    { "audible_key", "AES-128 Key for Audible AAXC files", OFFSET(audible_key),
+-        AV_OPT_TYPE_BINARY, .flags = AV_OPT_FLAG_DECODING_PARAM },
+-    { "audible_iv", "AES-128 IV for Audible AAXC files", OFFSET(audible_iv),
+-        AV_OPT_TYPE_BINARY, .flags = AV_OPT_FLAG_DECODING_PARAM },
+-    { "audible_fixed_key", // extracted from libAAX_SDK.so and AAXSDKWin.dll files!
+-        "Fixed key used for handling Audible AAX files", OFFSET(audible_fixed_key),
+-        AV_OPT_TYPE_BINARY, {.str="77214d4b196a87cd520045fd20a51d67"},
+-        .flags = AV_OPT_FLAG_DECODING_PARAM },
+     { "decryption_key", "The media decryption key (hex)", OFFSET(decryption_key), AV_OPT_TYPE_BINARY, .flags = AV_OPT_FLAG_DECODING_PARAM },
+     { "enable_drefs", "Enable external track support.", OFFSET(enable_drefs), AV_OPT_TYPE_BOOL,
+--- a/src/ffmpeg/libavformat/isom.h
++++ b/src/ffmpeg/libavformat/isom.h
+@@ -301,16 +301,4 @@
+     MOVFragmentIndex frag_index;
+     int atom_depth;
+-    unsigned int aax_mode;  ///< 'aax' file has been detected
+-    uint8_t file_key[20];
+-    uint8_t file_iv[20];
+-    void *activation_bytes;
+-    int activation_bytes_size;
+-    void *audible_fixed_key;
+-    int audible_fixed_key_size;
+-    void *audible_key;
+-    int audible_key_size;
+-    void *audible_iv;
+-    int audible_iv_size;
+-    struct AVAES *aes_decrypt;
+     uint8_t *decryption_key;
+     int decryption_key_len;

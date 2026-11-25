@@ -56,7 +56,9 @@ class LargeImageView: NSView {
     // MARK: - 图片编辑相关属性
     // MARK: - Image editing related properties
     var imageEditingView: ImageEditingView?
-    var isInEditMode: Bool = false
+    var isInEditMode: Bool = false {
+        didSet { updateImageNavigationButtons() }
+    }
     
     /// 同步编辑画布的位置和大小与 imageView 保持一致
     /// Sync editing canvas position and size with imageView
@@ -65,7 +67,9 @@ class LargeImageView: NSView {
         editingView.setImageFrame(imageView.frame)
     }
     
-    var file: FileModel = FileModel(path: "", ver: 0)
+    var file: FileModel = FileModel(path: "", ver: 0) {
+        didSet { updateImageNavigationButtons() }
+    }
     private var lastDragLocation: CGPoint?
     private var hasZoomedByWheel: Bool = false
     var longPressZoomTimer: Timer?
@@ -96,6 +100,18 @@ class LargeImageView: NSView {
     // Edge switching arrow views
     private var leftArrowImageView: NSImageView?
     private var rightArrowImageView: NSImageView?
+    private lazy var previousImageButton = ImageNavigationButton(
+        symbolName: "chevron.left",
+        label: NSLocalizedString("Back 11 Images", comment: "单张图片视图的向前跳转按钮"),
+        target: self,
+        action: #selector(jumpBackImages)
+    )
+    private lazy var nextImageButton = ImageNavigationButton(
+        symbolName: "chevron.right",
+        label: NSLocalizedString("Next Image", comment: "单张图片视图的下一张按钮"),
+        target: self,
+        action: #selector(advanceOneImage)
+    )
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -204,6 +220,9 @@ class LargeImageView: NSView {
         // 创建边缘切换箭头视图
         // Create edge switching arrow views
         createEdgeArrowViews()
+        addSubview(previousImageButton)
+        addSubview(nextImageButton)
+        updateImageNavigationButtons()
         
         // 设置鼠标跟踪
         // Set up mouse tracking
@@ -375,6 +394,26 @@ class LargeImageView: NSView {
 
     // MARK: - 边缘切换箭头视图
     // MARK: - Edge Switching Arrow Views
+
+    private func updateImageNavigationButtons() {
+        let showButtons = file.type == .image && !isInEditMode
+        previousImageButton.isHidden = !showButtons
+        nextImageButton.isHidden = !showButtons
+        if showButtons {
+            hideArrowView(leftArrowImageView, animated: false)
+            hideArrowView(rightArrowImageView, animated: false)
+        }
+    }
+
+    @objc private func jumpBackImages() {
+        guard file.type == .image, !isInEditMode else { return }
+        getViewController(self)?.previousLargeImage(steps: 11)
+    }
+
+    @objc private func advanceOneImage() {
+        guard file.type == .image, !isInEditMode else { return }
+        getViewController(self)?.nextLargeImage()
+    }
     
     private func createEdgeArrowViews() {
         // 定义箭头视图的样式
@@ -435,12 +474,15 @@ class LargeImageView: NSView {
         
         // 左侧箭头位置与尺寸
         // Left arrow position and size
-        leftArrowImageView?.frame = NSRect(
+        let leftFrame = NSRect(
             x: margin,
             y: (bounds.height - buttonSize) / 2,
             width: buttonSize,
             height: buttonSize
         )
+        leftArrowImageView?.frame = leftFrame
+        previousImageButton.frame = leftFrame
+        previousImageButton.updateSymbolSize(symbolPointSize)
         leftArrowImageView?.layer?.cornerRadius = cornerRadius
         leftArrowImageView?.layer?.borderWidth = borderWidth
         if let leftImage = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Previous")?.withSymbolConfiguration(symbolConfig) {
@@ -449,12 +491,15 @@ class LargeImageView: NSView {
         
         // 右侧箭头位置与尺寸
         // Right arrow position and size
-        rightArrowImageView?.frame = NSRect(
+        let rightFrame = NSRect(
             x: bounds.width - margin - buttonSize,
             y: (bounds.height - buttonSize) / 2,
             width: buttonSize,
             height: buttonSize
         )
+        rightArrowImageView?.frame = rightFrame
+        nextImageButton.frame = rightFrame
+        nextImageButton.updateSymbolSize(symbolPointSize)
         rightArrowImageView?.layer?.cornerRadius = cornerRadius
         rightArrowImageView?.layer?.borderWidth = borderWidth
         if let rightImage = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Next")?.withSymbolConfiguration(symbolConfig) {
@@ -1578,6 +1623,7 @@ class LargeImageView: NSView {
         // 只在启用边缘切换功能且在大图模式下才处理
         // Only process when edge switching is enabled and in large image mode
         guard globalVar.clickEdgeToSwitchImage,
+              file.type != .image,
               let viewController = getViewController(self),
               viewController.publicVar.isInLargeView,
               !isInEditMode else {
@@ -1725,7 +1771,7 @@ class LargeImageView: NSView {
             if clickLocation.x <= leftThreshold {
                 // 点击左侧，切换到上一张图像
                 // Click left side, switch to previous image
-                if leftArrowImageView?.isHidden == false {
+                if !isInEditMode && (file.type == .image || leftArrowImageView?.isHidden == false) {
                     lastClickTime = 0
                     viewController.previousLargeImage()
                     return
@@ -1733,7 +1779,7 @@ class LargeImageView: NSView {
             } else if clickLocation.x >= rightThreshold {
                 // 点击右侧，切换到下一张图像
                 // Click right side, switch to next image
-                if rightArrowImageView?.isHidden == false {
+                if !isInEditMode && (file.type == .image || rightArrowImageView?.isHidden == false) {
                     lastClickTime = 0
                     viewController.nextLargeImage()
                     return
@@ -2478,6 +2524,84 @@ class LargeImageView: NSView {
     /// Get whether currently in edit mode
     var isEditing: Bool {
         return isInEditMode
+    }
+}
+
+private final class ImageNavigationButton: NSButton {
+    private let symbolName: String
+    private var symbolSize: CGFloat = 0
+    private var isHovered = false
+    private var hoverTrackingArea: NSTrackingArea?
+
+    init(symbolName: String, label: String, target: AnyObject, action: Selector) {
+        self.symbolName = symbolName
+        super.init(frame: .zero)
+
+        self.target = target
+        self.action = action
+        title = ""
+        imagePosition = .imageOnly
+        imageScaling = .scaleNone
+        isBordered = false
+        contentTintColor = .black
+        toolTip = label
+        setAccessibilityLabel(label)
+
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.65).cgColor
+        layer?.borderColor = NSColor.black.withAlphaComponent(0.15).cgColor
+        layer?.borderWidth = 1
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    func updateSymbolSize(_ size: CGFloat) {
+        layer?.cornerRadius = bounds.width / 2
+        guard symbolSize != size else { return }
+        symbolSize = size
+        updateSymbol()
+    }
+
+    override var isHidden: Bool {
+        didSet {
+            if isHidden && isHovered {
+                isHovered = false
+                updateSymbol()
+            }
+        }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        hoverTrackingArea = area
+        addTrackingArea(area)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        isHovered = true
+        updateSymbol()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        isHovered = false
+        updateSymbol()
+    }
+
+    private func updateSymbol() {
+        let size = isHovered ? symbolSize * 1.15 : symbolSize
+        let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
+        image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
     }
 }
 
