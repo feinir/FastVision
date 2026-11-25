@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tarfile
@@ -50,16 +51,57 @@ def verify(supply):
     return records
 
 
+def verify_lgpl_frameworks(frameworks):
+    libraries = list(frameworks.glob("libavutil.xcframework/*/libavutil.framework/libavutil"))
+    if len(libraries) != 1:
+        raise SystemExit("Expected a single universal macOS libavutil framework.")
+    required = (
+        "--disable-gpl", "--disable-nonfree", "--enable-version3",
+        "--enable-videotoolbox", "--enable-shared", "--disable-static",
+    )
+    forbidden = (
+        "--enable-gpl", "--enable-nonfree", "--enable-libx264",
+        "--enable-libx265", "--enable-libxvid", "--enable-libvidstab",
+    )
+    for arch in ("arm64", "x86_64"):
+        strings = subprocess.check_output(
+            ["xcrun", "strings", "-arch", arch, "-a", str(libraries[0])],
+            text=True, errors="replace",
+        ).splitlines()
+        configs = [line.split() for line in strings if "--enable-version3" in line]
+        if "libavutil license: LGPL version 3 or later" not in strings or not any(
+            all(flag in flags for flag in required) and not any(flag in flags for flag in forbidden)
+            for flags in configs
+        ):
+            raise SystemExit(f"Could not verify the LGPL configuration for {arch}.")
+
+
+def package_source(supply, build, patches):
+    notices = build / "FFmpeg-LGPL"
+    notices.mkdir()
+    for name, license_path in (
+        ("LGPL-3.0.txt", "ffmpeg/COPYING.LGPLv3"),
+        ("GPL-3.0.txt", "ffmpeg/COPYING.GPLv3"),
+    ):
+        shutil.copyfile(supply / "licenses" / license_path, notices / name)
+    with tarfile.open(notices / "FFmpegKit-LGPL-source.tar.gz", "w:gz", dereference=True) as archive:
+        prefix = "FastVision-FFmpegKit-LGPL"
+        for name in ("README.md", "macos-lgpl.args", "build-macos.py", "source-lock.json"):
+            archive.add(supply / name, arcname=f"{prefix}/{name}")
+        for record in json.loads((supply / "source-lock.json").read_text()):
+            name = record["archive"]
+            archive.add(supply / name, arcname=f"{prefix}/{name}")
+        for patch in patches:
+            archive.add(patch, arcname=f"{prefix}/patches/{patch.name}")
+        for component in ("ffmpeg", "ffmpeg-kit", "dav1d", "libvpx"):
+            archive.add(supply / "licenses" / component, arcname=f"{prefix}/licenses/{component}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("build_directory", type=Path)
     parser.add_argument("--prepare-only", action="store_true")
     args = parser.parse_args()
-
-    if not args.prepare_only:
-        cmake_version = subprocess.check_output(["cmake", "--version"], text=True).splitlines()[0]
-        if not cmake_version.startswith("cmake version 3."):
-            raise SystemExit("Use CMake 3.31 on PATH for the pinned x265 build scripts.")
 
     supply = Path(__file__).resolve().parent
     build = args.build_directory.resolve()
@@ -70,8 +112,15 @@ def main():
         destination = record.get("build_path")
         if destination is not None:
             extract(supply / record["archive"], build / destination)
+        if destination_file := record.get("build_file"):
+            path = build / destination_file
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(supply / record["archive"], path)
+            path.chmod(0o755)
 
-    for patch in sorted((supply / "patches").glob("*.patch")):
+    patches = sorted((supply / "patches").glob("*.patch"))
+    patches = [patch for patch in patches if patch.name.startswith(("0006-", "0007-", "0008-"))]
+    for patch in patches:
         with patch.open("rb") as data:
             subprocess.run(["patch", "-p1", "-f"], cwd=build, stdin=data, check=True)
 
@@ -79,18 +128,20 @@ def main():
     prepare_git(build / "src" / "ffmpeg", "n6.0", (
         "ffbuild", "libavformat/file.c", "libavformat/protocols.c", "libavutil",
     ))
-    prepare_git(build / "src" / "x265", "3.4")
-    prepare_git(build / "src" / "xvidcore", paths=("xvidcore/build/generic/configure.in",))
     if args.prepare_only:
         return
-    environment = os.environ.copy()
+    # FFmpegKit logs the child environment. Pass only settings used by the build tools.
+    inherit = ("PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "DEVELOPER_DIR", "LANG", "LC_ALL")
+    environment = {key: os.environ[key] for key in inherit if key in os.environ}
     environment["ac_cv_prog_cc_c23"] = "no"
     environment["GIT_CEILING_DIRECTORIES"] = str(build / "src")
-    options = (supply / "macos-full-gpl.args").read_text().split()
+    options = (supply / "macos-lgpl.args").read_text().split()
     subprocess.run(["/bin/bash", "macos.sh", *options], cwd=build, env=environment, check=True)
     frameworks = Path("prebuilt/bundle-apple-xcframework-macos")
     if len(list((build / frameworks).glob("*.xcframework"))) != 8:
         raise SystemExit("The macOS build did not produce all eight XCFrameworks.")
+    verify_lgpl_frameworks(build / frameworks)
+    package_source(supply, build, patches)
     (build / frameworks.name).symlink_to(frameworks, target_is_directory=True)
 
 

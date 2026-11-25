@@ -220,6 +220,9 @@ extension ViewController {
                 contents.append(url)
             }
         }
+        #if APP_STORE
+        contents.removeAll { !SandboxFileAccess.shared.canBrowse($0.deletingLastPathComponent()) }
+        #endif
     }
     
     func isExifSortTimeExceedCancel(folderURL: URL, imageCount: Int, videoCount: Int) -> Bool {
@@ -254,6 +257,12 @@ extension ViewController {
         // guard let root = root else { return }
         // let aaa=folderURL.absoluteString
         
+        #if APP_STORE
+        let access = SandboxFileAccess.shared
+        let isVirtualFolder = folderURL.path.hasPrefix("/VirtualFinderTagsFolder")
+        if !isVirtualFolder, !access.canBrowse(folderURL), folderURL != initURL { return }
+        #endif
+
         // 找到了则停止
         // Stop if found
         if round != searchFolderRound {return}
@@ -295,10 +304,22 @@ extension ViewController {
                     if folderURL.path.hasPrefix("/VirtualFinderTagsFolder") {
                         let tagName = folderURL.lastPathComponent
                         scanVirtualFiles(at: folderURL, contents: &dirURLCache, properties: properties, tagName: tagName)
-                    }else if publicVar.isRecursiveMode {
-                        scanFiles(at: folderURL, contents: &dirURLCache, properties: properties)
-                    }else{
-                        dirURLCache = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: properties, options: [])
+                    } else {
+                        #if APP_STORE
+                        if !access.canBrowse(folderURL) {
+                            dirURLCache = access.explicitlyOpenedFiles(in: folderURL)
+                        } else if publicVar.isRecursiveMode {
+                            scanFiles(at: folderURL, contents: &dirURLCache, properties: properties)
+                        } else {
+                            dirURLCache = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: properties)
+                        }
+                        #else
+                        if publicVar.isRecursiveMode {
+                            scanFiles(at: folderURL, contents: &dirURLCache, properties: properties)
+                        } else {
+                            dirURLCache = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: properties, options: [])
+                        }
+                        #endif
                     }
                 }
                 contents.append(contentsOf: dirURLCache)
@@ -1097,7 +1118,18 @@ extension ViewController {
     }
     
     func switchDirByDirection(direction rawdirection: RightMouseGestureDirection, dest: String = "", doCollapse: Bool = true, expandLast: Bool = true, skip: Bool = false, stackDeep: Int, dryRun: Bool = false, needStopAutoScroll: Bool = true){
-        
+        #if APP_STORE
+        if rawdirection == .zero, !dest.isEmpty,
+           let url = URL(string: dest), !url.path.hasPrefix("/VirtualFinderTagsFolder") {
+            let access = SandboxFileAccess.shared
+            if !access.canBrowse(url), access.explicitlyOpenedFiles(in: url).isEmpty {
+                guard stackDeep == 0, let folder = access.chooseFolder(in: url) else { return }
+                openAuthorizedFolder(folder)
+                return
+            }
+        }
+        #endif
+
         if rawdirection == .zero {
             publicVar.isInStageOneProgress = true
         }

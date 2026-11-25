@@ -1,0 +1,8 @@
+--- a/scripts/apple/ffmpeg.sh
++++ b/scripts/apple/ffmpeg.sh
+@@ -412,3 +412,5 @@
+ if [ "$GPL_ENABLED" == "yes" ]; then
+   CONFIGURE_POSTFIX+=" --enable-gpl"
++else
++  CONFIGURE_POSTFIX+=" --disable-gpl --disable-nonfree"
+ fi

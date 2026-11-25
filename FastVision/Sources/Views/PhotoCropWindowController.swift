@@ -766,6 +766,12 @@ final class PhotoCropWindowController: NSWindowController, NSWindowDelegate, NST
         finishText()
         guard canSave, let window, window.attachedSheet == nil, let destination else { completion(false); return }
         guard let type = destination.type else { saveAs(completion: completion); return }
+        #if APP_STORE
+        if !SandboxFileAccess.shared.canBrowse(destination.url.deletingLastPathComponent()) {
+            saveAs(completion: completion)
+            return
+        }
+        #endif
 
         if confirmed || destination.url != sourceURL {
             write(to: destination.url, as: type, replacing: destination.snapshot, completion: completion)
@@ -809,6 +815,18 @@ final class PhotoCropWindowController: NSWindowController, NSWindowDelegate, NST
                 return
             }
             let type: UTType = output.pathExtension.lowercased() == "png" ? .png : .jpeg
+            #if APP_STORE
+            let folder = output.deletingLastPathComponent()
+            if !SandboxFileAccess.shared.canBrowse(folder) {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self,
+                          SandboxFileAccess.shared.chooseFolder(in: folder, forSaving: true) != nil,
+                          SandboxFileAccess.shared.canBrowse(folder) else { completion(false); return }
+                    self.write(to: output, as: type, replacing: try? SafeFileReplacement.Item(output), completion: completion)
+                }
+                return
+            }
+            #endif
             self.write(to: output, as: type, replacing: snapshot, completion: completion)
         }
     }

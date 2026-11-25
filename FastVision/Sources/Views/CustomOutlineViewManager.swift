@@ -135,7 +135,13 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
             return view
         }
         let view = outlineView.makeView(withIdentifier: NSUserInterfaceItemIdentifier("DataCell"), owner: self) as! CustomTableCellView
+        #if APP_STORE
+        let displayName = treeNode.localizedName ?? (treeNode.name.hasPrefix("/")
+            ? URL(string: treeNode.fullPath)?.lastPathComponent ?? treeNode.name : treeNode.name)
+        view.textField?.stringValue = displayName
+        #else
         view.textField?.stringValue = treeNode.localizedName ?? treeNode.name
+        #endif
         
         view.toolTip = treeNode.isFavorite ? URL(string: treeNode.fullPath).map(GlobalVar.favoriteDisplayPath) : nil
 
@@ -162,7 +168,12 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
                 view.imageView?.contentTintColor = .secondaryLabelColor
             }
         } else if treeViewData.root?.fullPath == "root", outlineView.parent(forItem: treeNode) == nil {
+            #if APP_STORE
+            let symbol = URL(string: treeNode.fullPath)?.pathComponents.count == 3 && treeNode.fullPath.hasPrefix("file:///Volumes/")
+                ? "internaldrive.fill" : "folder.fill"
+            #else
             let symbol = treeNode.name == TreeViewModel.homeRootName ? "house.fill" : "internaldrive.fill"
+            #endif
             view.imageView?.image = sidebarSymbol(symbol, pointSize: 16)
             view.imageView?.contentTintColor = .secondaryLabelColor
         } else {

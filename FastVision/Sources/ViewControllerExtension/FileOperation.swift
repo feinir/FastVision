@@ -941,21 +941,30 @@ extension ViewController {
         let curFolder = fileDB.curFolder
         fileDB.unlock()
         
+        #if APP_STORE
+        let needsConfirmation = isShowPrompt
+        #else
         let ifHasPermission = requestAppleEventsPermission()
+        let needsConfirmation = isShowPrompt || !ifHasPermission || VolumeManager.shared.isExternalVolume(urls.first!)
+        #endif
         let isShiftPressed = isShiftKeyPressed()
         
         let alert = NSAlert()
         alert.messageText = NSLocalizedString("Delete", comment: "删除")
         if isShiftPressed {
             alert.informativeText = NSLocalizedString("ask-to-delete-shift", comment: "你确定要将这些文件永久删除吗？此操作无法撤销。")
-        }else if VolumeManager.shared.isExternalVolume(urls.first!) {
-            alert.informativeText = NSLocalizedString("ask-to-delete-external", comment: "此目录不支持移动到废纸篓。将立即删除这些项目，此操作无法撤销。")
-        }else{
-            if ifHasPermission{
+        } else {
+            #if APP_STORE
+            alert.informativeText = NSLocalizedString("store-confirm-trash", value: "Move the selected items to the Trash?", comment: "")
+            #else
+            if VolumeManager.shared.isExternalVolume(urls.first!) {
+                alert.informativeText = NSLocalizedString("ask-to-delete-external", comment: "此目录不支持移动到废纸篓。将立即删除这些项目，此操作无法撤销。")
+            } else if ifHasPermission {
                 alert.informativeText = NSLocalizedString("ask-to-delete", comment: "你确定要将这些文件移动到废纸篓吗？")
             }else{
                 alert.informativeText = NSLocalizedString("ask-to-delete-nopermission", comment: "你确定要将这些文件移动到废纸篓吗？(无权限)")
             }
+            #endif
         }
         alert.alertStyle = .warning
         alert.addButton(withTitle: NSLocalizedString("Delete", comment: "删除"))
@@ -965,7 +974,7 @@ extension ViewController {
         alert.icon = NSImage(named: NSImage.cautionName)
 
         var response: NSApplication.ModalResponse = .alertFirstButtonReturn
-        if isShowPrompt || !ifHasPermission || VolumeManager.shared.isExternalVolume(urls.first!) {
+        if needsConfirmation {
             let StoreIsKeyEventEnabled = publicVar.isKeyEventEnabled
             publicVar.isKeyEventEnabled=false
             response = alert.runModal()
@@ -1010,6 +1019,25 @@ extension ViewController {
             globalVar.operationLogs.append(operationLog)
             
             if !urlsToDelete.isEmpty {
+                #if APP_STORE
+                let failures = urlsToDelete.compactMap { url -> String? in
+                    do {
+                        if isShiftPressed {
+                            try fileManager.removeItem(at: url)
+                        } else {
+                            try fileManager.trashItem(at: url, resultingItemURL: nil)
+                        }
+                        return nil
+                    } catch {
+                        return "\(url.lastPathComponent): \(error.localizedDescription)"
+                    }
+                }
+                if !failures.isEmpty {
+                    showAlert(message: failures.joined(separator: "\n"))
+                }
+                urlsToDelete = urlsToDelete.filter { !fileManager.fileExists(atPath: $0.path) }
+                guard !urlsToDelete.isEmpty else { return false }
+                #else
                 // 永久删除
                 // Permanently delete
                 if isShiftPressed {
@@ -1060,6 +1088,7 @@ extension ViewController {
                     }
                 }
                 
+                #endif
                 EnhancedIndex.handleFilesDeleted(urlsToDelete.map { $0.path })
 
                 // 文件更改计数

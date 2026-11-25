@@ -1,0 +1,5 @@
+--- a/.tmp/gas-preprocessor.pl
++++ b/.tmp/gas-preprocessor.pl
+@@ -1066 +1066 @@
+-            if ($line =~ /(?:ld|st)\d\s+({\s*v(\d+)\.(\d[bhsdBHSD])\s*-\s*v(\d+)\.(\d[bhsdBHSD])\s*})/) {
++            if ($line =~ /(?:ld|st)\d\s+(\{\s*v(\d+)\.(\d[bhsdBHSD])\s*-\s*v(\d+)\.(\d[bhsdBHSD])\s*\})/) {

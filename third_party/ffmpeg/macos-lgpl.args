@@ -1,0 +1,10 @@
+--target=12.0
+--xcframework
+--enable-macos-audiotoolbox
+--enable-macos-avfoundation
+--enable-macos-bzip2
+--enable-macos-libiconv
+--enable-macos-videotoolbox
+--enable-macos-zlib
+--enable-dav1d
+--enable-libvpx

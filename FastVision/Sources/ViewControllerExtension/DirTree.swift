@@ -86,6 +86,14 @@ extension ViewController {
             return
         }
 
+        #if APP_STORE
+        let url = URL(string: path)?.resolvingSymlinksInPath().standardizedFileURL
+        let components = url?.pathComponents ?? []
+        let scope = SandboxFileAccess.shared.browsingFolders
+            .filter { components.starts(with: $0.pathComponents) }
+            .max { $0.pathComponents.count < $1.pathComponents.count }
+        var targetPaths = scope.map { [$0.path] + components.dropFirst($0.pathComponents.count) } ?? []
+        #else
         let homeComponents = TreeViewModel.homeURL.pathComponents
         let pathComponents = URL(string: path)?.pathComponents ?? []
         let isInHome = treeRootFolder == "root" && pathComponents.starts(with: homeComponents)
@@ -133,6 +141,7 @@ extension ViewController {
             targetPaths.insert("/", at: 0)
         }
         
+        #endif
         // 标签
         // Tags
         if path.hasPrefix("file:///VirtualFinderTagsFolder") {

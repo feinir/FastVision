@@ -4,4 +4,6 @@
 // Optionally includes LocalDev.xcconfig for developer-specific settings.
 // LocalDev.xcconfig is gitignored and won't affect other collaborators.
 
+FASTVISION_FFMPEG_DIR = $(PROJECT_DIR)/../ffmpeg-kit-lgpl-build
+
 #include? "LocalDev.xcconfig"

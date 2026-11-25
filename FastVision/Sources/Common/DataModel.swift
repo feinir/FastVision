@@ -721,7 +721,9 @@ class TreeViewModel {
             } else if folderURL.path != "root" {
                 contents = try FileManager.default.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: [.isDirectoryKey, .isUbiquitousItemKey, .isHiddenKey, .contentModificationDateKey, .creationDateKey, .addedToDirectoryDateKey], options: [])
             }else{
-
+                #if APP_STORE
+                contents = SandboxFileAccess.shared.browsingFolders
+                #else
                 let fileManager = FileManager.default
                 let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsRemovableKey, .volumeIsInternalKey]
 
@@ -747,8 +749,7 @@ class TreeViewModel {
                     log("No mounted volumes found.")
                 }
                 
-                // let volumesURL = URL(fileURLWithPath: "/Volumes")
-                // contents.append(volumesURL)
+                #endif
             }
             
             // contents.sort { $0.absoluteString < $1.absoluteString }
@@ -910,7 +911,9 @@ class TreeViewModel {
 
             if folderURL.path == "root" {
                 let finderTagsURL = URL(string: "file:///VirtualFinderTagsFolder/")!
+                #if !APP_STORE
                 subFolders.insert(Self.homeURL, at: 0)
+                #endif
                 subFolders.append(finderTagsURL)
             }
 
@@ -932,6 +935,12 @@ class TreeViewModel {
                 if name == "/" {
                     localizedName = ROOT_NAME
                 }
+                #if APP_STORE
+                if folderURL.path == "root", !subFolder.path.hasPrefix("/VirtualFinderTagsFolder"),
+                   subFolder.path != "/PlaceholderForAutoHideToolbar" {
+                    name = subFolder.path
+                }
+                #endif
                 if name == "PlaceholderForAutoHideToolbar" {
                     localizedName = "FastVision"
                     fullPath = "file:///FastVisionTitleFolder/"

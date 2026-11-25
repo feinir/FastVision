@@ -180,7 +180,9 @@ final class GeneralSettingsViewController: NSViewController, SettingsPane {
     }
     
     @IBAction func openSystemPreferences(_ sender: Any) {
+        #if !APP_STORE
         _ = requestAppleEventsPermission()
+        #endif
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!
         NSWorkspace.shared.open(url)
     }
@@ -260,6 +262,9 @@ final class GeneralSettingsViewController: NSViewController, SettingsPane {
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(string: globalVar.homeFolder)
         if panel.runModal() == .OK, let url = panel.url {
+            #if APP_STORE
+            SandboxFileAccess.shared.accept(url)
+            #endif
             globalVar.homeFolder = url.absoluteString
             labelHomeFolder.stringValue = globalVar.homeFolder.removingPercentEncoding!.replacingOccurrences(of: "file://", with: "")
             UserDefaults.standard.set(globalVar.homeFolder, forKey: "homeFolder")

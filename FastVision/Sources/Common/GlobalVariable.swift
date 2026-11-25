@@ -73,6 +73,9 @@ class GlobalVar{
 
     func loadFavorites(from defaults: UserDefaults) {
         let stored = defaults.stringArray(forKey: Self.favoritesKey) ?? []
+        #if APP_STORE
+        myFavoritesArray = stored
+        #else
         let seededKey = "didSeedDefaultFavorites"
         guard !defaults.bool(forKey: seededKey) else {
             myFavoritesArray = stored
@@ -92,6 +95,7 @@ class GlobalVar{
         }
         defaults.set(myFavoritesArray, forKey: Self.favoritesKey)
         defaults.set(true, forKey: seededKey)
+        #endif
     }
 
     static func favoriteURL(for entry: String) -> URL? {

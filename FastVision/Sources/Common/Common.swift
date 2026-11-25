@@ -767,6 +767,9 @@ func captureSnapshot(of view: NSView) -> NSView? {
 }
 
 func triggerFinderSound() {
+    #if APP_STORE
+    NSSound(named: "Pop")?.play()
+    #else
     let fileManager = FileManager.default
     
     do {
@@ -821,6 +824,7 @@ func triggerFinderSound() {
     } catch {
         log("Error setting up directories: \(error)")
     }
+    #endif
 }
 
 func resolveRelativePath(basePath: String, relativePath: String) -> String? {

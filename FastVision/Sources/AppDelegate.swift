@@ -260,13 +260,51 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         // End applicationWillFinishLaunching
     }
 
+    @IBAction func showAboutFastVision(_ sender: Any?) {
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .paragraphStyle: style,
+        ]
+        let description = NSLocalizedString(
+            "about-ffmpeg-lgpl", value: "FFmpegKit 6.0 and FFmpeg 6.0 · LGPL v3", comment: ""
+        )
+        let credits = NSMutableAttributedString(string: description + "\n", attributes: attributes)
+        let links: [(String, URL?)] = [
+            (NSLocalizedString("about-ffmpeg-source", value: "Corresponding source", comment: ""),
+             Bundle.main.url(forResource: "FFmpegKit-LGPL-source", withExtension: "tar.gz", subdirectory: "FFmpeg-LGPL")?
+                 .deletingLastPathComponent()),
+            (NSLocalizedString("about-ffmpeg-license", value: "License", comment: ""),
+             Bundle.main.url(forResource: "LGPL-3.0", withExtension: "txt", subdirectory: "FFmpeg-LGPL")),
+            ("FFmpeg", URL(string: "https://github.com/FFmpeg/FFmpeg/tree/ea3d24bbe3c58b171e55fe2151fc7ffaca3ab3d2")),
+            ("FFmpegKit", URL(string: "https://github.com/arthenica/ffmpeg-kit/tree/d6be56d7aec286eb3c292d6b23ff07a6b70d8693")),
+        ]
+        for (index, entry) in links.compactMap({ label, url in url.map { (label, $0) } }).enumerated() {
+            if index != 0 { credits.append(NSAttributedString(string: "  ·  ", attributes: attributes)) }
+            let linkAttributes = attributes.merging([.link: entry.1]) { _, new in new }
+            credits.append(NSAttributedString(string: entry.0, attributes: linkAttributes))
+        }
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+    }
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
 
         log("Start applicationDidFinishLaunching")
         // Start applicationDidFinishLaunching
         
         if windowControllers.count == 0 {
-            _ = createNewWindow()
+            let window = createNewWindow()
+            #if APP_STORE
+            if SandboxFileAccess.shared.browsingFolders.isEmpty,
+               let controller = window?.contentViewController as? ViewController {
+                DispatchQueue.main.async { [weak controller] in
+                    if let folder = SandboxFileAccess.shared.chooseFolder() {
+                        controller?.openAuthorizedFolder(folder)
+                    }
+                }
+            }
+            #endif
         }
 
 //        DispatchQueue.global(qos: .userInitiated).async {
@@ -421,24 +459,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         }
     }
 
+    #if APP_STORE
+    func application(_ application: NSApplication, open urls: [URL]) {
+        openDocuments(urls)
+    }
+    #else
     func application(_ application: NSApplication, openFiles files: [String]) {
-        NSApplication.shared.reply(toOpenOrPrint: .success)
-        for filePath in files {
-            log(filePath)
+        application.reply(toOpenOrPrint: .success)
+        let urls = files.compactMap { path in
+            log(path)
+            let absolutePath = path == "." ? FileManager.default.currentDirectoryPath : path
+            return fileURLPreservingUnicode(path: absolutePath)
         }
-        
-        for path in files {
-            var path = path
-            if path == "." {
-                path = FileManager.default.currentDirectoryPath
-            }
-            
-            guard let url = fileURLPreservingUnicode(path: path)?.resolvingActualFilePath() else { continue }
+        openDocuments(urls)
+    }
+    #endif
+
+    private func openDocuments(_ urls: [URL]) {
+        for input in urls where input.isFileURL {
+            #if APP_STORE
+            SandboxFileAccess.shared.accept(input)
+            #endif
+            let url = input.resolvingActualFilePath()
             var file = url.absoluteString
             NSDocumentController.shared.noteNewRecentDocumentURL(url)
             
             var isDirectoryObj: ObjCBool = false
-            FileManager.default.fileExists(atPath: path, isDirectory: &isDirectoryObj)
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectoryObj)
             let isDirectory=isDirectoryObj.boolValue
             
             if isDirectory && file.last != "/" {file=file+"/"}
@@ -500,7 +547,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
         dialog.allowedFileTypes        = globalVar.HandledImageAndRawExtensions
         
         if (dialog.runModal() == NSApplication.ModalResponse.OK) {
-            if let result = dialog.url?.resolvingActualFilePath() {
+            if let input = dialog.url {
+                #if APP_STORE
+                SandboxFileAccess.shared.accept(input)
+                for window in windowControllers {
+                    (window.contentViewController as? ViewController)?.refreshTreeView()
+                }
+                #endif
+                let result = input.resolvingActualFilePath()
                 // Add the selected document to recent documents
                 NSDocumentController.shared.noteNewRecentDocumentURL(result)
                 

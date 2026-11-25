@@ -998,7 +998,14 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             #else
             let defaultFolder = GlobalVar.defaultHomeFolder
             #endif
+            #if APP_STORE
+            let access = SandboxFileAccess.shared
+            let candidates = [openFolder, lastFolder, defaultFolder].compactMap { $0 }.compactMap(URL.init(string:))
+            let startFolder = (candidates.first(where: access.canBrowse)
+                               ?? access.browsingFolders.first ?? access.documents).absoluteString
+            #else
             let startFolder = openFolder ?? lastFolder ?? defaultFolder
+            #endif
             fileDB.lock()
             fileDB.curFolder = startFolder
             fileDB.unlock()
@@ -2458,7 +2465,19 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         }
     }
     
+    #if APP_STORE
+    func openAuthorizedFolder(_ folder: URL) {
+        refreshTreeView()
+        switchDirByDirection(direction: .zero, dest: folder.absoluteString, stackDeep: 0)
+    }
+    #endif
+
     func handleDraggedFiles(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        #if APP_STORE
+        for url in urls { SandboxFileAccess.shared.accept(url) }
+        refreshTreeView()
+        #endif
         let urls = urls.map { $0.resolvingActualFilePath() }
         var folderPath="file:///"
         var path="file:///"

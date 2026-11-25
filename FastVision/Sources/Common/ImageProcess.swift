@@ -796,13 +796,13 @@ func getVideoThumbnailFFmpeg(for url: URL, at time: TimeInterval = 10) -> NSImag
     let thumbnailPath = tempDirectory.appendingPathComponent(uniqueFilename).path
     
     // let ffmpegCommand = "-i '\(url.path)' -ss \(time) -vf \"select=eq(n\\,100),thumbnail,scale=512:-1\" -qscale:v 2 -frames:v 1 \(thumbnailPath)"
-    // let ffmpegCommand = "-i '\(url.path)' -vf \"scale=1280:-1,blackframe=0,metadata=select:key=lavfi.blackframe.pblack:value=50:function=less\" -frames:v 1 \(thumbnailPath)"
 
     // 构建 ffmpeg 命令的参数数组
     // Build ffmpeg command argument array
+    let thumbnailFilter = "scale=1280:-2,format=yuv420p,signalstats,metadata=select:key=lavfi.signalstats.YAVG:value=32:function=greater"
     let ffmpegArgs: [String] = [
         "-i", url.path,
-        "-vf", "scale=1280:-1,blackframe=0,metadata=select:key=lavfi.blackframe.pblack:value=50:function=less",
+        "-vf", thumbnailFilter,
         "-frames:v", "1",
         "-threads", "2",
         thumbnailPath
