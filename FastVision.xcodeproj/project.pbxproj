@@ -737,14 +737,14 @@
 				CODE_SIGN_ENTITLEMENTS = FastVision/FastVision.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20260908;
+				CURRENT_PROJECT_VERSION = 20261125.1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FastVision/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FastVision;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2024 netdcy";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "FastVision uses Finder to move selected files to the Trash.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "FastVision © 2026 @feinir · FlowVision © 2024 netdcy";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -752,7 +752,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.7.6;
+				MARKETING_VERSION = 1.8.0;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision.debug;
 				PRODUCT_MODULE_NAME = FastVision;
@@ -771,15 +771,15 @@
 				CODE_SIGN_ENTITLEMENTS = FastVision/FastVision.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20260908;
+				CURRENT_PROJECT_VERSION = 20261125.1;
 
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FastVision/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = FastVision;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.graphics-design";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "";
-				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2024 netdcy";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "FastVision uses Finder to move selected files to the Trash.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "FastVision © 2026 @feinir · FlowVision © 2024 netdcy";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -787,7 +787,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.7.6;
+				MARKETING_VERSION = 1.8.0;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision;
 				PRODUCT_MODULE_NAME = FastVision;

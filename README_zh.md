@@ -1,77 +1,39 @@
-<p align="center">
-<h1 align="center">FastVision</h1>
-<h3 align="center">Fast 系列的 macOS 瀑布流图片浏览器</h3>
-</p>
+# FastVision
 
+FastVision 是 Fast 系列的 macOS 图片和视频浏览器，适合按文件夹整理摄影作品、设计素材和视频片段。选一个本地目录，从满屏缩略图里找到想看的内容，再打开大图或播放视频。
 
-## 预览
+[English](README.md) · [下载](https://github.com/feinir/FastVision/releases) · [问题反馈](https://github.com/feinir/FastVision/issues)
 
-以下截图来自上游 FlowVision。
+## 应用截图
 
-### 浅色模式
-![preview](./docs/preview_2.png)
+截图来自运行中的 FastVision 1.8.0，使用的是示例图库。
 
-### 黑暗模式
-![preview](./docs/preview_1.png)
+![FastVision 浅色界面，显示收藏夹、目录栏和缩略图](docs/screenshots/browser-light.png)
 
-## 应用特点:
+| 大图预览 | 关于 FastVision |
+| --- | --- |
+| ![FastVision 深色界面中的单张图片预览](docs/screenshots/preview-dark.png) | ![关于 FastVision 窗口显示 1.8.0 版本号和上游署名](docs/screenshots/about.png) |
 
- - 自适应布局模式、浅色/深色模式
+## 可以用它做什么
 
- - 方便的文件管理（操作类似 Finder）
+- 在瀑布流、网格和等高布局之间切换，或开启递归浏览，一次查看子文件夹里的媒体。
+- 把常用目录加入收藏夹，从侧栏进入个人主目录、已挂载磁盘和 Finder 标签。
+- 按文件名搜索，按 Finder 标签或评分筛选，或用多个标签页对照不同目录。
+- 放大查看图片细节，在支持的屏幕上查看 HDR 图片，并预览或播放视频。
+- 直接复制、移动和重命名文件，也可以在 Finder 里打开文件所在位置。
 
- - 右键手势、快速查找上一个/下一个有图片/视频的文件夹
+## 安装与使用
 
- - 针对目录下大量图片情况的性能优化
+FastVision 支持 **macOS 12 及以上**，可在 Apple Silicon 和 Intel Mac 上运行。从 [GitHub Releases](https://github.com/feinir/FastVision/releases) 下载已发布版本的 DMG，打开后把 FastVision 拖入「应用程序」。发布页也提供对应源码包和 SHA-256 校验文件。
 
- - 高质量的缩放（减轻摩尔纹等问题）
+通过「文件 → 打开…」选择一个目录。双击缩略图打开预览，按方向键切换图片，按 **Esc** 返回缩略图，按 **⌘F** 搜索。
 
- - 支持视频播放
+## 从源码构建
 
- - 支持HDR显示
+安装 Xcode，按 [FFmpeg 对应源码和 macOS 构建说明](third_party/ffmpeg/README.md) 从固定版本的源码编译八个框架，再按同一份说明准备依赖并构建 FastVision。其他依赖及其版本见[应用源码清单](third_party/app-sources/source-lock.json)。
 
- - 支持递归模式
+## 项目来源与许可证
 
-## 安装使用
+FastVision 由 [@feinir](https://github.com/feinir) 独立维护，于 2026 年 11 月 25 日从 netdcy 与贡献者开发的 [FlowVision](https://github.com/netdcy/FlowVision) 分离并改造。分离后的 FastVision 使用自己的名称、图标、文档和发布渠道，并继续改进界面。仓库保留上游提交历史与署名。
 
-### 系统需求
-
- - macOS 12.0+
-
-### 隐私与安全性
-
- - 开源软件
- - 无网络请求
-
-当前可按下文的编译步骤构建本地版本。
-
-## 操作说明
-
-### 图片浏览:
- - 双击打开/关闭图片
- - 按住右键/左键滚动滚轮可以缩放
- - 按住中键拖动可以移动窗口
- - 长按左键切换 100%缩放
- - 长按右键切换缩放到视图
-### 右键手势:
- - 向右/左：切换到下一个/上一个有图片/视频的文件夹(逻辑上等同于将整个磁盘中的文件夹排序后的下一个)
- - 向上：切换到上级目录
- - 向下：返回到上一次的目录
- - 向上右：切换到与当前文件夹平级的下一个有图片的文件夹
- - 向下右：关闭当前标签页/窗口
-### 键盘按键:
- - W：同右键手势 向上
- - A/D：同右键手势 向左/右
- - S：同右键手势 向下
-
-## 编译
-
-按 [FFmpeg 对应源码和构建说明](./third_party/ffmpeg/README.md) 从本地固定源码构建 macOS 双架构框架，然后按说明准备 Xcode 工程所需的同级目录。[应用依赖源码清单](./third_party/app-sources/source-lock.json) 记录了各自的固定提交。
-
-## 上游来源与许可
-
-FastVision 基于 [netdcy/FlowVision](https://github.com/netdcy/FlowVision)，由 FastVision 项目独立维护。感谢 netdcy 和 FlowVision 的贡献者。
-
-2026-11-25，FastVision 修改了应用名称、工程标识和中英文文档。有关改动可在 Git 提交记录中查看。
-
-本项目按 GNU GPL v3 发布，许可证全文见 [LICENSE](./LICENSE)。第三方组件适用各自的许可证。
+本项目按 [GNU GPL v3](LICENSE) 发布。第三方组件沿用各自的许可证和声明，见 [FFmpeg 组件声明](third_party/ffmpeg/licenses/)和[应用依赖许可证](third_party/app-sources/licenses/)。

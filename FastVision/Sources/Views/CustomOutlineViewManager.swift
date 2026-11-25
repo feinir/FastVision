@@ -6,6 +6,8 @@
 import Foundation
 import Cocoa
 
+private final class SidebarSectionDivider: NSObject {}
+
 class CustomOutlineViewManager: NSObject {
     var fileDB: DatabaseModel
     var treeViewData: TreeViewModel
@@ -13,6 +15,26 @@ class CustomOutlineViewManager: NSObject {
     weak var outlineView: NSOutlineView?
     
     private var adjustColumnWidthWorkItem: DispatchWorkItem?
+    private let locationsDivider = SidebarSectionDivider()
+    private let finderTagsDivider = SidebarSectionDivider()
+    private static let finderTagsPath = "file:///VirtualFinderTagsFolder/"
+    private static let titlePath = "file:///FastVisionTitleFolder/"
+
+    private var rootItems: [NSObject] {
+        guard let root = treeViewData.root, let children = root.children else { return [] }
+        guard root.fullPath == "root" else { return children }
+
+        var items: [NSObject] = []
+        for node in children {
+            if node.fullPath == Self.finderTagsPath {
+                items.append(finderTagsDivider)
+            } else if items.last === treeViewData.favoritesSection {
+                items.append(locationsDivider)
+            }
+            items.append(node)
+        }
+        return items
+    }
     
     init(fileDB: DatabaseModel, treeViewData: TreeViewModel, outlineView: NSOutlineView) {
         self.fileDB = fileDB
@@ -31,8 +53,9 @@ class CustomOutlineViewManager: NSObject {
         let wasExpanded = outlineView.isItemExpanded(treeViewData.favoritesSection)
         treeViewData.updateFavorites()
 
+        let wasActingWhenSelected = ifActWhenSelected
         ifActWhenSelected = false
-        defer { ifActWhenSelected = true }
+        defer { ifActWhenSelected = wasActingWhenSelected }
         outlineView.reloadItem(treeViewData.favoritesSection, reloadChildren: true)
         if wasExpanded {
             outlineView.expandItem(treeViewData.favoritesSection)
@@ -47,17 +70,13 @@ class CustomOutlineViewManager: NSObject {
 
 extension CustomOutlineViewManager: NSOutlineViewDataSource {
     func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-        guard let treeNode = item as? TreeNode else {
-            return treeViewData.root?.children?.count ?? 0
-        }
-        return treeNode.children?.count ?? 0
+        if item == nil { return rootItems.count }
+        return (item as? TreeNode)?.children?.count ?? 0
     }
 
     func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-        guard let treeNode = item as? TreeNode else {
-            return treeViewData.root?.children?[index] ?? ""
-        }
-        return treeNode.children?[index] ?? ""
+        if item == nil { return rootItems[index] }
+        return (item as? TreeNode)?.children?[index] ?? ""
     }
 
     func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
@@ -86,7 +105,12 @@ extension CustomOutlineViewManager: NSOutlineViewDataSource {
 extension CustomOutlineViewManager: NSOutlineViewDelegate {
 
     func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
-        (item as? TreeNode) !== treeViewData.favoritesSection
+        guard let node = item as? TreeNode else { return false }
+        return node !== treeViewData.favoritesSection
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat {
+        item is SidebarSectionDivider ? 9 : outlineView.rowHeight
     }
 
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
@@ -116,12 +140,12 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
         view.toolTip = treeNode.isFavorite ? URL(string: treeNode.fullPath).map(GlobalVar.favoriteDisplayPath) : nil
 
         if treeNode === treeViewData.favoritesSection {
-            view.imageView?.image = NSImage(systemSymbolName: "star", accessibilityDescription: nil)
+            view.imageView?.image = sidebarSymbol("star", pointSize: 18)
             view.imageView?.contentTintColor = .secondaryLabelColor
-        } else if treeNode.fullPath.contains("FastVisionTitleFolder") {
+        } else if treeNode.fullPath == Self.titlePath {
             view.imageView?.image = NSImage(named: "AppIcon")
             view.imageView?.contentTintColor = nil
-        } else if treeNode.fullPath.hasPrefix("file:///VirtualFinderTagsFolder") {
+        } else if treeNode.fullPath.hasPrefix(Self.finderTagsPath) {
             let tagIcon = NSImage(systemSymbolName: "tag.fill", accessibilityDescription: nil)?
                 .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 14, weight: .regular))
             if let url = URL(string: treeNode.fullPath), url.path != "/VirtualFinderTagsFolder" {
@@ -137,6 +161,10 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
                 view.imageView?.image = tagIcon
                 view.imageView?.contentTintColor = .secondaryLabelColor
             }
+        } else if treeViewData.root?.fullPath == "root", outlineView.parent(forItem: treeNode) == nil {
+            let symbol = treeNode.name == TreeViewModel.homeRootName ? "house.fill" : "internaldrive.fill"
+            view.imageView?.image = sidebarSymbol(symbol, pointSize: 16)
+            view.imageView?.contentTintColor = .secondaryLabelColor
         } else {
             let folderIcon = NSImage(named: NSImage.folderName)?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 20, weight: .regular))
             view.imageView?.image = folderIcon
@@ -162,6 +190,11 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
         }
         
         return view
+    }
+
+    private func sidebarSymbol(_ name: String, pointSize: CGFloat) -> NSImage? {
+        NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: pointSize, weight: .medium))
     }
     func outlineViewSelectionDidChange(_ notification: Notification) {
         guard let outlineView = notification.object as? NSOutlineView else { return }
@@ -189,7 +222,19 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
         
     }
     func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? {
-        return CustomTableRowView()
+        guard item is SidebarSectionDivider else { return CustomTableRowView() }
+
+        let row = NSTableRowView()
+        let line = NSBox()
+        line.boxType = .separator
+        line.translatesAutoresizingMaskIntoConstraints = false
+        row.addSubview(line)
+        NSLayoutConstraint.activate([
+            line.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 14),
+            line.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -14),
+            line.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+        ])
+        return row
     }
     
     func outlineViewItemDidExpand(_ notification: Notification) {
@@ -206,9 +251,10 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
                 if !child.isFavoriteSeparator && child.fullPath == curFolder {
                     if let row = outlineView?.row(forItem: child),
                        row != -1 {
-                        ifActWhenSelected=false
+                        let wasActingWhenSelected = ifActWhenSelected
+                        ifActWhenSelected = false
                         outlineView?.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-                        ifActWhenSelected=true
+                        ifActWhenSelected = wasActingWhenSelected
                         break
                     }
                 }
@@ -275,6 +321,15 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
         return children.last?.favoriteIndex.map { $0 + 1 } ?? globalVar.myFavoritesArray.count
     }
 
+    private func fileDropTarget(_ item: Any?, childIndex: Int) -> URL? {
+        guard childIndex == NSOutlineViewDropOnItemIndex,
+              let node = item as? TreeNode, !node.isFavorite,
+              node !== treeViewData.favoritesSection,
+              node.fullPath != Self.titlePath, !node.fullPath.hasPrefix(Self.finderTagsPath),
+              let url = URL(string: node.fullPath), url.isFileURL else { return nil }
+        return url
+    }
+
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
         if info.draggingPasteboard.types?.contains(GlobalVar.favoriteDragType) == true {
             guard (info.draggingSource as? NSOutlineView) === outlineView,
@@ -282,11 +337,7 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
                   favoriteInsertionIndex(parent: item, childIndex: index) != nil else { return [] }
             return .move
         }
-        if let node = item as? TreeNode,
-           node.isFavorite || node === treeViewData.favoritesSection || node.fullPath.hasPrefix("file:///VirtualFinderTagsFolder") {
-            return []
-        }
-        return .move
+        return fileDropTarget(item, childIndex: index) == nil ? [] : .move
     }
     
     func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
@@ -297,48 +348,38 @@ extension CustomOutlineViewManager: NSOutlineViewDelegate {
             return globalVar.moveFavorite(from: source, before: insertion)
         }
 
-        guard let outlineItem = item as? TreeNode, !outlineItem.isFavorite,
-              outlineItem !== treeViewData.favoritesSection else { return false }
-        guard let viewController = getViewController(outlineView) else { return false }
+        guard let targetUrl = fileDropTarget(item, childIndex: index),
+              let viewController = getViewController(outlineView) else { return false }
 
-        if let targetUrl = URL(string: outlineItem.fullPath) {
-            let pasteboard = info.draggingPasteboard
-            if let data = pasteboard.data(forType: .fileURL),
-               let pasteboardUrl = URL(dataRepresentation: data, relativeTo: nil),
-               pasteboardUrl == targetUrl {
-                // URLs are identical, do not perform the move
-                return false
-            }
-            
-            if viewController.handleFilePromiseDrop(targetURL: targetUrl, pasteboard: pasteboard) {
-                return true
-            }
-            
-            // 从outlineView自身拖拽时，显示确认对话框防止误操作
-            if info.draggingSource is NSOutlineView,
-               let data = pasteboard.data(forType: .fileURL),
-               let sourceUrl = URL(dataRepresentation: data, relativeTo: nil) {
-                let sourceName = sourceUrl.lastPathComponent
-                let confirmed = showConfirmation(
-                    title: NSLocalizedString("Move Items", comment: "移动项目"),
-                    message: String(format: NSLocalizedString("Are you sure you want to move xxx to xxx?", comment: "确定要移动 xxx 到 xxx?"), sourceName, targetUrl.lastPathComponent)
-                )
-                if !confirmed {
-                    return false
-                }
-            }
-            
-            viewController.handleMove(targetURL: targetUrl, pasteboard: pasteboard)
+        let pasteboard = info.draggingPasteboard
+        if let data = pasteboard.data(forType: .fileURL),
+           let pasteboardUrl = URL(dataRepresentation: data, relativeTo: nil),
+           pasteboardUrl == targetUrl {
+            return false
+        }
+
+        if viewController.handleFilePromiseDrop(targetURL: targetUrl, pasteboard: pasteboard) {
             return true
         }
-        
-        return false
+
+        if info.draggingSource is NSOutlineView,
+           let data = pasteboard.data(forType: .fileURL),
+           let sourceUrl = URL(dataRepresentation: data, relativeTo: nil) {
+            let confirmed = showConfirmation(
+                title: NSLocalizedString("Move Items", comment: "移动项目"),
+                message: String(format: NSLocalizedString("Are you sure you want to move xxx to xxx?", comment: "确定要移动 xxx 到 xxx?"), sourceUrl.lastPathComponent, targetUrl.lastPathComponent)
+            )
+            if !confirmed { return false }
+        }
+
+        viewController.handleMove(targetURL: targetUrl, pasteboard: pasteboard)
+        return true
     }
     
     func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
         guard let outlineItem = item as? TreeNode, outlineItem !== treeViewData.favoritesSection else { return nil }
         if let index = outlineItem.favoriteIndex { return globalVar.favoriteDragItem(at: index) }
-        if outlineItem.fullPath.hasPrefix("file:///VirtualFinderTagsFolder") { return nil }
+        if outlineItem.fullPath == Self.titlePath || outlineItem.fullPath.hasPrefix(Self.finderTagsPath) { return nil }
         
         let pasteboardItem = NSPasteboardItem()
 

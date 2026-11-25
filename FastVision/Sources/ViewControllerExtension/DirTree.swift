@@ -49,6 +49,10 @@ extension ViewController {
     }
     
     private func selectFinalItem(outlineView: NSOutlineView, targetPaths: [String]) {
+        let wasActingWhenSelected = outlineViewManager.ifActWhenSelected
+        outlineViewManager.ifActWhenSelected = false
+        defer { outlineViewManager.ifActWhenSelected = wasActingWhenSelected }
+
         var currentItem: Any? = nil
         for path in targetPaths {
             let count = outlineView.numberOfChildren(ofItem: currentItem)
@@ -63,17 +67,15 @@ extension ViewController {
                 }
             }
             if !found {
-                outlineViewManager.ifActWhenSelected=false
                 outlineView.selectRowIndexes([], byExtendingSelection: false)
-                outlineViewManager.ifActWhenSelected=true
                 return
             }
         }
-        if let finalItem = currentItem, let rowIndex = outlineView.row(forItem: finalItem) as Int? {
-            outlineViewManager.ifActWhenSelected=false
+        if let finalItem = currentItem {
+            let rowIndex = outlineView.row(forItem: finalItem)
+            guard rowIndex >= 0 else { return }
             outlineView.selectRowIndexes(IndexSet(integer: rowIndex), byExtendingSelection: false)
             outlineView.scrollRowToVisible(rowIndex)
-            outlineViewManager.ifActWhenSelected=true
         }
     }
     
