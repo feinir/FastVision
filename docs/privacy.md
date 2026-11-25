@@ -10,7 +10,9 @@ FastVision reads files and folders you select to display images, generate previe
 
 FastVision does not require an account. The developer does not collect your photos, videos, browsing activity, or identity information through the app. FastVision does not contain advertising or analytics trackers.
 
-If you choose to open a link or map from FastVision, macOS opens the relevant app or website. Opening a map shares the selected location with the map service you open. Those services apply their own privacy policies.
+If you choose Share, macOS passes the files you selected to the service you choose. Opening a link or map hands off to the relevant app or website. Opening a map passes the selected location to the map service. Those services apply their own privacy policies.
+
+FastVision does not retain data on a server. You can remove local preferences, cached data, and saved folder permissions by removing the app’s local data from your Mac.
 
 ## Questions
 

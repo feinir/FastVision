@@ -285,6 +285,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemVa
             let linkAttributes = attributes.merging([.link: entry.1]) { _, new in new }
             credits.append(NSAttributedString(string: entry.0, attributes: linkAttributes))
         }
+        if let privacyPolicyURL = URL(string: "https://github.com/feinir/FastVision/blob/main/docs/privacy.md") {
+            let privacyPolicyLabel = NSLocalizedString("Privacy Policy", comment: "Link in the About panel")
+            credits.append(NSAttributedString(string: "\n" + privacyPolicyLabel, attributes: attributes.merging([
+                .link: privacyPolicyURL,
+            ]) { _, new in new }))
+        }
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     }
 
