@@ -540,7 +540,7 @@ class DirModel {
     
     var files = Map<SortKeyFile,FileModel>()
     var layoutCalcPos = 0
-    var lastLayoutCalcPosUsed = 0
+    var scheduledThumbnailCount = 0
     var ver: Int
     // var searchVer: Int
     var folderCount: Int = 0

@@ -386,9 +386,11 @@ final class FileInfoSectionView: NSView {
     private var contentContainer: NSView!
     private var disclosure: NSButton?
     private var isCollapsed: Bool
+    private let compact: Bool
 
-    init(section: FileInfoSection) {
+    init(section: FileInfoSection, compact: Bool = false) {
         self.isCollapsed = section.collapsible && section.initiallyCollapsed
+        self.compact = compact
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         build(section: section)
@@ -438,7 +440,7 @@ final class FileInfoSectionView: NSView {
         let content: NSView
         switch section.kind {
         case .keyValue(let pairs):
-            content = buildKeyValueGrid(pairs: pairs)
+            content = compact ? buildInspectorRows(pairs) : buildKeyValueGrid(pairs: pairs)
         case .textBlock(let text, let monospace):
             content = buildTextBlock(text: text, monospace: monospace)
         }
@@ -529,6 +531,58 @@ final class FileInfoSectionView: NSView {
             grid.addRow(with: [keyLabel, valueField])
         }
         return grid
+    }
+
+    private func buildInspectorRows(_ pairs: [(String, String)]) -> NSView {
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 0
+
+        for (index, pair) in pairs.enumerated() {
+            if index > 0 {
+                let separator = NSBox()
+                separator.boxType = .separator
+                separator.translatesAutoresizingMaskIntoConstraints = false
+                stack.addArrangedSubview(separator)
+                NSLayoutConstraint.activate([
+                    separator.widthAnchor.constraint(equalTo: stack.widthAnchor),
+                    separator.heightAnchor.constraint(equalToConstant: 1)
+                ])
+            }
+
+            let row = NSView()
+            row.translatesAutoresizingMaskIntoConstraints = false
+            let key = NSTextField(wrappingLabelWithString: pair.0)
+            key.font = .systemFont(ofSize: 12, weight: .medium)
+            let value = NSTextField(wrappingLabelWithString: pair.1)
+            value.font = .systemFont(ofSize: 12)
+            value.textColor = .secondaryLabelColor
+            value.isSelectable = true
+            for field in [key, value] {
+                field.lineBreakMode = .byCharWrapping
+                field.maximumNumberOfLines = 0
+                field.translatesAutoresizingMaskIntoConstraints = false
+                field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                row.addSubview(field)
+            }
+            stack.addArrangedSubview(row)
+            NSLayoutConstraint.activate([
+                row.widthAnchor.constraint(equalTo: stack.widthAnchor),
+                key.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+                key.topAnchor.constraint(equalTo: row.topAnchor, constant: 7),
+                key.bottomAnchor.constraint(lessThanOrEqualTo: row.bottomAnchor, constant: -7),
+                key.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.36),
+                value.leadingAnchor.constraint(equalTo: key.trailingAnchor, constant: 10),
+                value.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+                value.topAnchor.constraint(equalTo: key.topAnchor),
+                value.bottomAnchor.constraint(lessThanOrEqualTo: row.bottomAnchor, constant: -7),
+            ])
+            let snugHeight = value.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -7)
+            snugHeight.priority = .defaultHigh
+            snugHeight.isActive = true
+        }
+        return stack
     }
 
     private func buildTextBlock(text: String, monospace: Bool) -> NSView {

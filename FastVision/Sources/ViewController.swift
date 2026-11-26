@@ -190,6 +190,7 @@ class PublicVar{
                     }
                 }
                 updateToolbar()
+                viewController.requestMetadataInspectorUpdate()
                 if globalVar.portableMode {
                     viewController.adjustWindowPortable(firstShowThumb: true, animate: false)
                 }
@@ -205,17 +206,6 @@ class PublicVar{
     var lastLargeImageIdInImage: Int = 0
     var isCollectionViewFirstResponder: Bool = false
     var isOutlineViewFirstResponder: Bool = false
-    var isShowExif: Bool = false {
-        didSet {
-            if let largeImageView = viewController.largeImageView,
-               isShowExif && largeImageView.exifTextView.textItems.isEmpty{
-                let exifData = convertExifData(file: largeImageView.file)
-                largeImageView.updateTextItems(formatExifData(exifData ?? [:], isVideo: globalVar.HandledVideoExtensions.contains(largeImageView.file.ext), needWarp: true))
-            }
-            viewController.largeImageView.exifTextView.isHidden = !isShowExif
-            updateToolbar()
-        }
-    }
     var isNeedChangeLayoutType = false
     var justifiedLayout = CustomFlowLayout()
     var gridLayout = CustomGridLayout()
@@ -292,6 +282,12 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
     @IBOutlet weak var coreAreaView: CoreAreaView!
     @IBOutlet weak var outlineView: CustomOutlineView!
     @IBOutlet weak var splitView: CustomSplitView!
+    let metadataInspector = MetadataInspectorView(frame: .zero)
+    var inspectorClosedConstraint: NSLayoutConstraint!
+    var inspectorOpenConstraint: NSLayoutConstraint!
+    var inspectorURLs: [URL] = []
+    var inspectorRead: DispatchWorkItem?
+    var inspectorGeneration: UInt = 0
     
     var treeViewData = TreeViewModel()
     
@@ -339,7 +335,6 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
     var collectionViewManager: CustomCollectionViewManager!
     var outlineViewManager: CustomOutlineViewManager!
     
-    var snapshotQueue = [NSView?]()
     var pendingThumbnailRefreshScrollOrigin: NSPoint?
     
     var initialPoint: NSPoint?
@@ -539,6 +534,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         // 初始化splitView
         // Initialize splitView
         splitView.delegate = self
+        setUpMetadataInspector()
         
         // 初始化DrawingView
         // Initialize DrawingView
@@ -682,7 +678,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         // Left mouse button event
         eventMonitorLeftMouseDown = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
             guard let self = self else { return event }
-            if event.window != self.view.window { return event }
+            if event.window != self.view.window || inspectorContains(event) { return event }
 
             if publicVar.isInLargeView && largeImageView.file.type == .video,
                let videoView = largeImageView.videoView {
@@ -708,7 +704,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
 
         eventMonitorLeftMouseUp = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { [weak self] event in
             guard let self = self else { return event }
-            if event.window != self.view.window { return event }
+            if event.window != self.view.window || inspectorContains(event) { return event }
 
             if publicVar.isInLargeView && largeImageView.file.type == .video,
                let videoView = largeImageView.videoView {
@@ -797,6 +793,14 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         // Monitor keyboard key presses
         eventMonitorKeyDown = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self=self else{return event}
+            if event.window === self.view.window, isMetadataInspectorVisible,
+               metadataInspector.containsFocus(event.window?.firstResponder) {
+                if event.keyCode == 53 {
+                    toggleMetadataInspector()
+                    return nil
+                }
+                return event
+            }
             if event.window === self.view.window, let review = self.similarPhotosViewController {
                 switch event.keyCode {
                 case 53:
@@ -818,7 +822,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window || self.similarPhotosViewController != nil {
+            if event.window != self.view.window || self.similarPhotosViewController != nil || inspectorContains(event) {
                 return event
             }
             if true || self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -837,7 +841,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window || self.similarPhotosViewController != nil {
+            if event.window != self.view.window || self.similarPhotosViewController != nil || inspectorContains(event) {
                 return event
             }
             if self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -856,7 +860,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
             guard let self=self else{return event}
             // if getMainViewController() != self {return event}
             // 检查事件的窗口是否是激活窗口
-            if event.window != self.view.window || self.similarPhotosViewController != nil {
+            if event.window != self.view.window || self.similarPhotosViewController != nil || inspectorContains(event) {
                 return event
             }
             if true || self.coreAreaView.frame.contains(event.locationInWindow) {
@@ -946,6 +950,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         scrollDebounceWorkItem = nil
         arrowScrollDebounceWorkItem?.cancel()
         arrowScrollDebounceWorkItem = nil
+        cancelMetadataInspectorLoad()
         
         // 停止所有计时器
         // Stop all timers
@@ -1094,15 +1099,17 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         }
 
         let dividerThickness = splitView.dividerThickness
-        let contentWidth = splitView.bounds.width - sidebarView.frame.width - dividerThickness
+        let availableWidth = max(0, splitView.bounds.width - dividerThickness)
+        let sidebarWidth = min(sidebarView.frame.width, availableWidth)
+        let contentWidth = availableWidth - sidebarWidth
         let isRTL = splitView.userInterfaceLayoutDirection == .rightToLeft
 
         if isRTL {
             contentView.frame = CGRect(x: 0, y: 0, width: contentWidth, height: splitView.bounds.height)
-            sidebarView.frame = CGRect(x: contentWidth + dividerThickness, y: 0, width: sidebarView.frame.width, height: splitView.bounds.height)
+            sidebarView.frame = CGRect(x: contentWidth + dividerThickness, y: 0, width: sidebarWidth, height: splitView.bounds.height)
         } else {
-            sidebarView.frame = CGRect(x: 0, y: 0, width: sidebarView.frame.width, height: splitView.bounds.height)
-            contentView.frame = CGRect(x: sidebarView.frame.width + dividerThickness, y: 0, width: contentWidth, height: splitView.bounds.height)
+            sidebarView.frame = CGRect(x: 0, y: 0, width: sidebarWidth, height: splitView.bounds.height)
+            contentView.frame = CGRect(x: sidebarWidth + dividerThickness, y: 0, width: contentWidth, height: splitView.bounds.height)
         }
     }
     func splitViewDidResizeSubviews(_ notification: Notification) {
@@ -1144,7 +1151,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
 
         // 获取当前宽度
         // Get current width
-        let currentWidth = collectionView.bounds.width
+        let currentWidth = mainScrollView.bounds.width
         
         // 检查宽度是否发生变化
         // Check if width has changed
@@ -1166,36 +1173,27 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
         
         changeWaterfallLayoutNumberOfColumns()
         
-        // startTime = DispatchTime.now()
         recalcLayout(curFolder)
-//        if(true){
-//            let curTime = DispatchTime.now()
-//            let nanoTime = curTime.uptimeNanoseconds - startTime.uptimeNanoseconds
-//            let timeInterval = Double(nanoTime) / 1_000_000_000
-//            log("Time taken to fully calculate layout: \(timeInterval) seconds")
-//        }
-        // collectionView.collectionViewLayout=LeftAlignedCollectionViewFlowLayout()
-        collectionView.collectionViewLayout?.invalidateLayout()
-        view.window?.layoutIfNeeded()
-        // collectionView.collectionViewLayout=LeftAlignedCollectionViewFlowLayout()
-        
-        // 以下是处理左侧目录树，防止在宽度为0时切换目录，再拉宽时，某些条目显示...
-        // 注：似乎改变了实现方式（直接从数据源获取而不是可见view），就不用此处调用了，这里调用计算量大会导致卡顿
-        // Below is handling for left directory tree, prevent items from displaying incorrectly when switching directories at width 0 then widening
-        // Note: Implementation seems changed (getting directly from data source instead of visible view), no need to call here, calling here causes lag due to heavy computation
-        // outlineViewManager.adjustColumnWidth()
-        
-        // 解决改变窗口大小，由于不彻底重载，导致的缩放不正常（有时，原因未知）
-        // Fix abnormal scaling when window size changes due to incomplete reload (sometimes, reason unknown)
-        if true {
-            let visibleIndexPaths=collectionView.indexPathsForVisibleItems()
-            for indexPath in visibleIndexPaths{
-                if let item = collectionView.item(at: indexPath) as? CustomCollectionViewItem {
-                    item.configureWithImage(item.file,playAnimation:false)
-                }
+        fileDB.lock()
+        let readyCount = fileDB.db[SortKeyDir(curFolder)]?.layoutCalcPos ?? 0
+        fileDB.unlock()
+
+        if readyCount < collectionViewManager.presentedItemCount {
+            let selection = collectionView.selectionIndexPaths.filter { $0.item < readyCount }
+            reloadThumbnailCollection(presenting: readyCount)
+            collectionView.selectionIndexPaths = selection
+        } else {
+            collectionView.collectionViewLayout?.invalidateLayout()
+            view.window?.layoutIfNeeded()
+        }
+
+        for indexPath in collectionView.indexPathsForVisibleItems() {
+            if let item = collectionView.item(at: indexPath) as? CustomCollectionViewItem,
+               item.file === collectionViewManager.file(at: indexPath) {
+                item.configureWithImage(item.file)
             }
         }
-        
+
         // 刷新工具栏
         // Refresh toolbar
         if let windowController = view.window?.windowController as? WindowController {
@@ -1376,7 +1374,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                 guard let self = self else { return }
                                 
                                 fileDB.lock()
-                                guard ver == dirModel.ver else {
+                                guard ver == dirModel.ver, dir == fileDB.curFolder else {
                                     fileDB.unlock()
                                     return
                                 }
@@ -1386,8 +1384,7 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                 file.isGetImageSizeFail=isGetImageSizeFail
                                 let count=dirModel.files.count
                                 let layoutIsComplete = dirModel.layoutCalcPos == count
-                                let curFolder=fileDB.curFolder
-                                let keepScrollPos=dirModel.keepScrollPos
+                                let keepScrollPos = dirModel.keepScrollPos
                                 fileDB.unlock()
                                 
                                 // 80~0.07s, 50~0.05s, 20~0.04s
@@ -1395,93 +1392,61 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                     recalcLayout(dir)
                                 }
                                 
-                                if dir == curFolder && i == count-1 {
-                                    publishThumbnailRefresh()
-                                }
-                                
                                 fileDB.lock()
-                                let lastLayoutCalcPosUsed = dirModel.lastLayoutCalcPosUsed
-                                let nowLayoutCalcPos = dirModel.layoutCalcPos
+                                let lastScheduled = dirModel.scheduledThumbnailCount
+                                let readyCount = dirModel.layoutCalcPos
                                 fileDB.unlock()
-                                
-                                if(i == count-1){
-                                    let curTime = DispatchTime.now()
-                                    let nanoTime = curTime.uptimeNanoseconds - startTime.uptimeNanoseconds
-                                    let timeInterval = Double(nanoTime) / 1_000_000_000
-                                    log("Time taken to fully load size information: \(timeInterval) seconds")
-                                }
-                                
-                                //                            if nowLayoutCalcPos-lastLayoutCalcPosUsed > 100 {
-                                // 避免一次显示太多导致载入缓存目录时不能瞬间显示，但这样似乎更慢了
-                                // Avoid displaying too many at once causing cached directory to not display instantly, but this seems slower
-                                //                                nowLayoutCalcPos=lastLayoutCalcPosUsed+100
-                                //                                fileDB.lock()
-                                //                                fileDB.db[SortKeyDir(dir)]!.layoutCalcPos=nowLayoutCalcPos
-                                //                                fileDB.unlock()
-                                //                            }
-                                if(nowLayoutCalcPos > lastLayoutCalcPosUsed && (publicVar.timer.intervalSafe(name: "insertItems", second: min(0.02+Double(i)*0.0001,4.0)) || nowLayoutCalcPos == count)){
-                                    var indexPaths = [IndexPath]()
-                                    for x in lastLayoutCalcPosUsed...nowLayoutCalcPos-1{
-                                        indexPaths.append(IndexPath(item: x, section: 0))
-                                    }
-                                    if(dir == curFolder){
-                                        
-                                        coreAreaView.hideInfo()
 
-                                        let curItemCount = collectionView.numberOfItems(inSection: 0)
-                                        
-                                        if curItemCount + indexPaths.count >= nowLayoutCalcPos {
-                                            if !keepScrollPos {
-                                                let newIndexPaths = indexPaths.dropFirst(curItemCount + indexPaths.count - nowLayoutCalcPos)
-                                                if lastLayoutCalcPosUsed == 0 {
-                                                    // Rebuild the first batch after a folder reset. Later batches only append.
-                                                    reloadThumbnailCollection()
-                                                } else if !newIndexPaths.isEmpty {
-                                                    collectionView.insertItems(at: Set(newIndexPaths))
-                                                }
-                                                setProgress(Double(nowLayoutCalcPos) / Double(count))
-                                                selectItemsNewChanged(isFinal: false, checkRange: indexPaths)
-                                            }
-                                            
-                                            if nowLayoutCalcPos == count {
-                                                fileDB.lock()
-                                                dirModel.keepScrollPos=true
-                                                fileDB.unlock()
-                                                
-                                                selectItemsNewChanged(isFinal: true)
-                                            }
-                                        }
-                                        // collectionView.reloadData()
-                                        // collectionView.numberOfItems(inSection:0)
-                                        // 此时开始渐变动画？
-                                        // Start fade animation now?
-                                        
+                                if i == count - 1 {
+                                    publishThumbnailRefresh(upTo: readyCount)
+                                    let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startTime.uptimeNanoseconds) / 1_000_000_000
+                                    log("Time taken to fully load size information: \(elapsed) seconds")
+                                }
+
+                                let previousCount = collectionViewManager.presentedItemCount
+                                let shouldPresent = !keepScrollPos && readyCount > previousCount
+                                let shouldQueueThumbnails = readyCount > lastScheduled
+                                guard shouldPresent || shouldQueueThumbnails,
+                                      readyCount == count || publicVar.timer.intervalSafe(name: "insertItems", second: min(0.02 + Double(i) * 0.0001, 4.0)) else { return }
+
+                                if shouldPresent {
+                                    let newIndexPaths = (previousCount..<readyCount).map { IndexPath(item: $0, section: 0) }
+                                    if previousCount == 0 || collectionView.numberOfItems(inSection: 0) != previousCount {
+                                        reloadThumbnailCollection(presenting: readyCount)
+                                    } else {
+                                        collectionViewManager.presentItems(upTo: readyCount)
+                                        collectionView.insertItems(at: Set(newIndexPaths))
+                                        collectionView.layoutSubtreeIfNeeded()
                                     }
-                                    for x in lastLayoutCalcPosUsed...nowLayoutCalcPos-1{
-                                        // TODO: 大量读取文件时造成系统内存不足
-                                        // TODO: Reading a large number of files may cause system out-of-memory issues
-                                        let memUseLimit = globalVar.memUseLimit
-                                        if x > memUseLimit {
-                                            break
-                                        }
+                                    setProgress(Double(readyCount) / Double(count))
+                                    selectItemsNewChanged(isFinal: false, checkRange: newIndexPaths)
+                                }
+                                if collectionViewManager.presentedItemCount > 0 {
+                                    coreAreaView.hideInfo()
+                                }
+
+                                if readyCount == count {
+                                    fileDB.lock()
+                                    dirModel.keepScrollPos = true
+                                    fileDB.unlock()
+                                    selectItemsNewChanged(isFinal: true)
+                                }
+
+                                if shouldQueueThumbnails {
+                                    let end = min(readyCount, globalVar.memUseLimit + 1)
+                                    if lastScheduled < end {
                                         fileDB.lock()
-                                        let curKey = dirModel.files.elementSafe(atOffset: x)?.0
-                                        let file = dirModel.files.elementSafe(atOffset: x)?.1
+                                        let tasks = (lastScheduled..<end).compactMap { dirModel.files.elementSafe(atOffset: $0) }
                                         fileDB.unlock()
-                                        guard let curKey=curKey,let file=file else{continue}
                                         loadImageTaskPool.lock.lock()
-                                        loadImageTaskPool.push(dir,(dir,dirModel,curKey,file,dirModel.ver,OtherTaskInfo()))
-                                        loadImageTaskPoolSemaphore.signal()
-                                        loadImageTaskPool.lock.unlock()
-                                        if x == 0 {
-                                            let curTime = DispatchTime.now()
-                                            let nanoTime = curTime.uptimeNanoseconds - startTime.uptimeNanoseconds
-                                            let timeInterval = Double(nanoTime) / 1_000_000_000
-                                            log("Time taken to add first image to readImage pool: \(timeInterval) seconds")
+                                        for (key, file) in tasks {
+                                            loadImageTaskPool.push(dir, (dir, dirModel, key, file, ver, OtherTaskInfo()))
+                                            loadImageTaskPoolSemaphore.signal()
                                         }
+                                        loadImageTaskPool.lock.unlock()
                                     }
                                     fileDB.lock()
-                                    dirModel.lastLayoutCalcPosUsed=nowLayoutCalcPos
+                                    dirModel.scheduledThumbnailCount = readyCount
                                     fileDB.unlock()
                                 }
                             }
@@ -1586,56 +1551,6 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                             log("Time taken to fully load image thumbnails: \(timeInterval) seconds")
                             log("-----------------------------------------------------------")
                         }
-                        // 此时开始渐变动画
-                        // Start fade animation now
-                        // 防止其它队列末尾任务造成提前渐变
-                        // Prevent premature fade from other queue tail tasks
-                        if dir == curFolder {
-                            DispatchQueue.main.async { [weak self] in
-                                guard let self = self else { return }
-                                
-                                fileDB.lock()
-                                let curFolder=fileDB.curFolder
-                                fileDB.unlock() 
-                                
-                                if ver != dirModel.ver {return}
-                                if dir != curFolder {return}
-                                
-                                coreAreaView.hideInfo()
-                                
-                                let curTime = DispatchTime.now()
-                                let nanoTime = curTime.uptimeNanoseconds - startTime.uptimeNanoseconds
-                                let timeInterval = Double(nanoTime) / 1_000_000_000
-                                if i>40 || i==count-1 || timeInterval>0.3 {
-                                    
-                                    if snapshotQueue.count > 0 {
-                                        let curTime = DispatchTime.now()
-                                        let nanoTime = curTime.uptimeNanoseconds - startTime.uptimeNanoseconds
-                                        let timeInterval = Double(nanoTime) / 1_000_000_000
-                                        log("Time taken to reach hidden snapshot reason 1: \(timeInterval) seconds")
-                                        log("-----------------------------------------------------------")
-                                    }
-                                    
-                                    while snapshotQueue.count > 0{
-                                        let snapshot=snapshotQueue.first!
-                                        snapshotQueue.removeFirst()
-                                        // publicVar.isInLargeView=false
-                                        NSAnimationContext.runAnimationGroup({ context in
-                                            context.duration = 0.2
-                                            snapshot?.animator().alphaValue = 0
-//                                            self.largeImageView.animator().alphaValue = 0
-//                                            self.largeImageBgEffectView.animator().alphaValue = 0
-                                        }, completionHandler: {
-                                            snapshot?.removeFromSuperview()
-//                                            self.largeImageView.isHidden=true
-//                                            self.largeImageBgEffectView.isHidden=true
-//                                            publicVar.isInLargeViewAfterAnimate=false
-                                        })
-                                    }
-                                }
-                            }
-                        }
-                        
                         // 因为优先级调度未能预先计算到目标大小时，设置标识
                         // Set flag when priority scheduling fails to pre-calculate target size
                         var noThumbSizeDueToSchedule = false
@@ -1756,7 +1671,11 @@ class ViewController: NSViewController, NSSplitViewDelegate, NSSearchFieldDelega
                                             let indexPath = IndexPath(item: currentItemIndex, section: 0)
                                             // A refresh can move a file to a different item view.
                                             if let item = collectionView.item(at: indexPath) as? CustomCollectionViewItem,
-                                               item.file === file {
+                                               let thumbnailView = item.view as? ThumbnailItemView,
+                                               thumbnailView.presentationGeneration == collectionView.thumbnailGeneration,
+                                               !thumbnailView.isHidden,
+                                               item.file === file,
+                                               collectionViewManager.file(at: indexPath) === file {
                                                 fileDB.lock()
                                                 item.configureWithImage(file,playAnimation:true)
                                                 // log(i)

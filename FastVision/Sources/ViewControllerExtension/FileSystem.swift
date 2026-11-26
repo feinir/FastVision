@@ -777,7 +777,6 @@ extension ViewController {
         fileDB.lock()
         let lastCurFolder = fileDB.curFolder
         fileDB.unlock()
-        let previousThumbnailItems = collectionView.visibleItems()
         
         // 清空任务池
         // Clear task pool
@@ -789,15 +788,9 @@ extension ViewController {
         loadImageTaskPool.setMostPriority(queueName: path)
         loadImageTaskPool.lock.unlock()
         
-        // 是捕获界面，还是将从finder打开替换为目录中打开
-        // Capture interface, or replace opening from finder with opening in directory
+        let wasBrowsingPreview = publicVar.isInLargeView && publicVar.openFromFinderPath.isEmpty
         var openedFile: FileModel?
         if publicVar.openFromFinderPath == "" {
-            if publicVar.isInLargeView,
-               let snapshot = captureSnapshot(of: coreAreaView) {
-                coreAreaView.addSubview(snapshot)
-                snapshotQueue.append(snapshot)
-            }
 //            currLargeImagePos = -1
             initLargeImagePos = -1
             if publicVar.lastLargeImageIdInImage == 0 {
@@ -841,19 +834,6 @@ extension ViewController {
             
         }
         
-        if publicVar.isNeedChangeLayoutType {
-            if publicVar.profile.layoutType == .waterfall {
-                collectionView.collectionViewLayout=publicVar.waterfallLayout
-            }else if publicVar.profile.layoutType == .grid {
-                collectionView.collectionViewLayout=publicVar.gridLayout
-            }else if publicVar.profile.layoutType == .justified {
-                collectionView.collectionViewLayout=publicVar.justifiedLayout
-            }else {
-                assertionFailure()
-            }
-            publicVar.isNeedChangeLayoutType = false
-        }
-        
         // 清空collectionView
         // Clear collectionView
         fileDB.lock()
@@ -867,7 +847,7 @@ extension ViewController {
         let preserveScroll = !needClearThenInsert && !keys.isEmpty
         let canPublishImmediately = preserveScroll && keys.allSatisfy { $0.1.originalSize != nil }
         dirModel.layoutCalcPos = 0
-        dirModel.lastLayoutCalcPosUsed = 0
+        dirModel.scheduledThumbnailCount = 0
         if needClearThenInsert {
             dirModel.keepScrollPos = false
         }
@@ -877,6 +857,20 @@ extension ViewController {
             }
         }
         fileDB.unlock()
+
+        collectionViewManager.replaceFiles(keys.map { $0.1 })
+        if publicVar.isNeedChangeLayoutType {
+            if publicVar.profile.layoutType == .waterfall {
+                collectionView.collectionViewLayout=publicVar.waterfallLayout
+            }else if publicVar.profile.layoutType == .grid {
+                collectionView.collectionViewLayout=publicVar.gridLayout
+            }else if publicVar.profile.layoutType == .justified {
+                collectionView.collectionViewLayout=publicVar.justifiedLayout
+            }else {
+                assertionFailure()
+            }
+            publicVar.isNeedChangeLayoutType = false
+        }
 
         if lastCurFolder != path {
             closeSimilarPhotos(restoreFocus: false)
@@ -896,14 +890,9 @@ extension ViewController {
         if canPublishImmediately {
             // Deletions can reuse the remaining files' dimensions for a single reload.
             recalcLayout(path)
-            publishThumbnailRefresh()
+            publishThumbnailRefresh(upTo: keys.count)
         } else {
-            // AppKit may keep the previous cells attached while the item count is zero.
-            for item in previousThumbnailItems {
-                item.view.isHidden = true
-            }
-            // Lay out the empty view before the next folder can publish thumbnails.
-            reloadThumbnailCollection()
+            reloadThumbnailCollection(presenting: 0)
         }
         
         if true{
@@ -918,8 +907,6 @@ extension ViewController {
             // Hide folder info
             collectionView.hideFolderInfo()
             
-            // 对于空文件夹，播放渐变动画（因为没有分派任务，所以在任务里的渐变调用不到）
-            // For empty folders, play fade animation (because no tasks are dispatched, fade in tasks won't be called)
             if keys.isEmpty {
                 setProgress(1.0)
 
@@ -931,22 +918,8 @@ extension ViewController {
                     }
                 }
                 
-                while snapshotQueue.count > 0{
-                    let snapshot=snapshotQueue.first!
-                    snapshotQueue.removeFirst()
-                    publicVar.isInLargeView=false
-                    NSAnimationContext.runAnimationGroup({ context in
-                        context.duration = 0.2
-                        snapshot?.animator().alphaValue = 0
-                        self.largeImageView.animator().alphaValue = 0
-                        self.largeImageBgEffectView.animator().alphaValue = 0
-                    }, completionHandler: {
-                        snapshot?.removeFromSuperview()
-                        self.largeImageView.isHidden=true
-                        self.largeImageBgEffectView.isHidden=true
-                        self.publicVar.isInLargeViewAfterAnimate=false
-                        self.setWindowTitle()
-                    })
+                if wasBrowsingPreview {
+                    closeLargeImage(0)
                 }
             }
             
@@ -963,16 +936,6 @@ extension ViewController {
                     if !publicVar.isInLargeView && collectionView.numberOfItems(inSection: 0) == 0 {
                         coreAreaView.showInfo(NSLocalizedString("Loading...", comment: "加载中..."), timeOut: .infinity, cannotBeCleard: false)
                     }
-
-                    while !snapshotQueue.isEmpty {
-                        let snapshot = snapshotQueue.removeFirst()
-                        NSAnimationContext.runAnimationGroup({ context in
-                            context.duration = 0.2
-                            snapshot?.animator().alphaValue = 0
-                        }, completionHandler: {
-                            snapshot?.removeFromSuperview()
-                        })
-                    }
                 }
             }
         }
@@ -985,16 +948,17 @@ extension ViewController {
         }
     }
     
-    func reloadThumbnailCollection() {
+    func reloadThumbnailCollection(presenting count: Int) {
+        collectionViewManager.presentItems(upTo: count)
         collectionView.reloadData()
         collectionView.numberOfItems(inSection: 0)
         mainScrollView.layoutSubtreeIfNeeded()
     }
 
-    func publishThumbnailRefresh() {
+    func publishThumbnailRefresh(upTo count: Int) {
         guard let scrollOrigin = pendingThumbnailRefreshScrollOrigin else { return }
         pendingThumbnailRefreshScrollOrigin = nil
-        reloadThumbnailCollection()
+        reloadThumbnailCollection(presenting: count)
 
         let clipView = mainScrollView.contentView
         let bounds = NSRect(origin: scrollOrigin, size: clipView.bounds.size)
@@ -1332,6 +1296,7 @@ extension ViewController {
         switchFolder(path: nextFolder)
         startWatchingDirectory(atPath: nextFolder.replacingOccurrences(of: "file://", with: "").removingPercentEncoding!)
         if !publicVar.isInLargeView {setWindowTitle()}
+        requestMetadataInspectorUpdate(force: true)
         LRUMemRecord(path: nextFolder, count: fileCount)
         
         let defaults = UserDefaults.standard
@@ -1472,7 +1437,7 @@ extension ViewController {
             //     ))
             // }
             if let formatted = getVideoMetadataFormatedFFmpeg(for: resolvedUrl), !formatted.isEmpty {
-                sections.append(contentsOf: splitVideoMetadataIntoSections(formatted))
+                sections.append(contentsOf: Self.splitVideoMetadataIntoSections(formatted))
             }
             if let raw = getVideoMetadataFFmpeg(for: resolvedUrl), !raw.isEmpty {
                 sections.append(FileInfoSection(
@@ -1688,7 +1653,7 @@ extension ViewController {
     /// semantic sections: container info, then one section per video/audio stream.
     /// Detection relies on the `index` key being the first localized key in each
     /// stream's translation map for both video and audio.
-    private func splitVideoMetadataIntoSections(_ pairs: [(String, String)]) -> [FileInfoSection] {
+    static func splitVideoMetadataIntoSections(_ pairs: [(String, String)]) -> [FileInfoSection] {
         let videoIndexKey = NSLocalizedString("VideoMetadata-Index", comment: "索引")
         let audioIndexKey = NSLocalizedString("AudioMetadata-Index", comment: "索引")
 

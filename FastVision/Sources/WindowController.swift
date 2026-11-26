@@ -357,7 +357,6 @@ extension WindowController: NSToolbarDelegate {
                 }
                 // identifiers.append(.rotateL)
                 identifiers.append(.rotateR)
-                identifiers.append(.showinfo)
             }else{
                 if viewController.publicVar.profile.getValue(forKey: "isWindowTitleUseFullPath") == "true" {
                     identifiers.append(.pathControl)
@@ -393,6 +392,7 @@ extension WindowController: NSToolbarDelegate {
                 }
             }
         }
+        identifiers.append(.showinfo)
         
         if #available(macOS 26.0, *), SDK_VERSION >= 26 {
             identifiers.append(.space)
@@ -753,19 +753,21 @@ extension WindowController: NSToolbarDelegate {
             toolbarItem.visibilityPriority = .low
         
         case .showinfo:
-            var image: NSImage
-            if viewController.publicVar.isShowExif {
-                image = NSImage(systemSymbolName: "info.circle.fill", accessibilityDescription: "")!
-            }else{
-                image = NSImage(systemSymbolName: "info.circle", accessibilityDescription: "")!
-            }
-            let button = NSButton(title: "", image: image, target: self, action: #selector(showinfoAction(_:)))
+            let active = viewController.isMetadataInspectorVisible
+            let label = NSLocalizedString("inspector-title", value: "File Inspector", comment: "")
+            let actionTitle = active
+                ? NSLocalizedString("inspector-hide", value: "Hide File Inspector", comment: "")
+                : NSLocalizedString("inspector-show", value: "Show File Inspector", comment: "")
+            let button = NSButton(title: "", target: self, action: #selector(showinfoAction(_:)))
+            button.image = NSImage(systemSymbolName: active ? "info.circle.fill" : "info.circle", accessibilityDescription: label)
             setButtonStyle(button)
-            button.toolTip = NSLocalizedString("Show Info", comment: "显示信息")
+            button.setAccessibilityLabel(actionTitle)
+            button.toolTip = actionTitle
+            if active { button.contentTintColor = .controlAccentColor }
             toolbarItem.view = button
-            toolbarItem.label = NSLocalizedString("Show Info", comment: "显示信息")
-            toolbarItem.paletteLabel = NSLocalizedString("Show Info", comment: "显示信息")
-            toolbarItem.visibilityPriority = .standard
+            toolbarItem.label = label
+            toolbarItem.paletteLabel = label
+            toolbarItem.visibilityPriority = .high
             
         case .rotateL:
             let button = NSButton(title: "", image: NSImage(systemSymbolName: "arrow.counterclockwise", accessibilityDescription: "")!, target: self, action: #selector(rotateLAction(_:)))
@@ -1030,9 +1032,7 @@ extension WindowController: NSToolbarDelegate {
     }
     
     @objc func showinfoAction(_ sender: Any?) {
-        if let viewController = contentViewController as? ViewController {
-            viewController.largeImageView.actShowExif()
-        }
+        (contentViewController as? ViewController)?.toggleMetadataInspector()
     }
     
     @objc func rotateLAction(_ sender: Any?) {

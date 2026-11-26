@@ -32,7 +32,6 @@ class LargeImageView: NSView {
     var pausedBySeek = false
     var restorePlayPosition: CMTime?
     var restorePlayURL: URL?
-    var isVideoMetadataUpdated: Bool = false
     var abPlayPositionA: CMTime?
     var abPlayPositionB: CMTime?
     var videoEndObserver: NSObjectProtocol?
@@ -46,7 +45,6 @@ class LargeImageView: NSView {
     var videoControlsView: VideoPlayerControlsView!
     private var periodicTimeObserver: Any?
     
-    var exifTextView: ExifTextView!
     var ratioView: InfoView!
     var infoView: InfoView!
     var unsupportedVideoOverlay: NSView!
@@ -68,7 +66,12 @@ class LargeImageView: NSView {
     }
     
     var file: FileModel = FileModel(path: "", ver: 0) {
-        didSet { updateImageNavigationButtons() }
+        didSet {
+            updateImageNavigationButtons()
+            if file.path != oldValue.path {
+                getViewController(self)?.requestMetadataInspectorUpdate()
+            }
+        }
     }
     private var lastDragLocation: CGPoint?
     private var hasZoomedByWheel: Bool = false
@@ -140,15 +143,6 @@ class LargeImageView: NSView {
             videoControlsView.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -6),
             videoControlsView.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -6),
             videoControlsView.heightAnchor.constraint(equalToConstant: 32),
-        ])
-        
-        exifTextView = ExifTextView(frame: .zero)
-        exifTextView.translatesAutoresizingMaskIntoConstraints = false
-        exifTextView.isHidden=true
-        addSubview(exifTextView)
-        NSLayoutConstraint.activate([
-            exifTextView.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -5),
-            exifTextView.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -5)
         ])
         
         ratioView = InfoView(frame: .zero)
@@ -233,11 +227,6 @@ class LargeImageView: NSView {
         DispatchQueue.main.async { [weak self] in
             self?.updateArrowViewPositions()
         }
-    }
-    
-    func updateTextItems(_ items: [(String, Any)]) {
-        exifTextView.textItems = items
-        exifTextView.invalidateIntrinsicContentSize()
     }
 
     func refreshFinderTagDots() {
@@ -395,14 +384,35 @@ class LargeImageView: NSView {
     // MARK: - 边缘切换箭头视图
     // MARK: - Edge Switching Arrow Views
 
-    private func updateImageNavigationButtons() {
-        let showButtons = file.type == .image && !isInEditMode
-        previousImageButton.isHidden = !showButtons
-        nextImageButton.isHidden = !showButtons
-        if showButtons {
-            hideArrowView(leftArrowImageView, animated: false)
-            hideArrowView(rightArrowImageView, animated: false)
+    private func updateImageNavigationButtons(at windowPoint: NSPoint? = nil) {
+        guard file.type == .image, !isInEditMode, !isHiddenOrHasHiddenAncestor, let window else {
+            hideImageNavigationButtons()
+            return
         }
+
+        let pointer = convert(windowPoint ?? window.mouseLocationOutsideOfEventStream, from: nil)
+        let button = pointer.x < bounds.midX ? previousImageButton : nextImageButton
+        let hoverArea = button.frame.insetBy(dx: -button.frame.width / 2, dy: -button.frame.height / 2)
+        let isOverButtonArea = visibleRect.contains(pointer) && hoverArea.contains(pointer)
+        previousImageButton.isHidden = !isOverButtonArea || button !== previousImageButton
+        nextImageButton.isHidden = !isOverButtonArea || button !== nextImageButton
+        hideArrowView(leftArrowImageView, animated: false)
+        hideArrowView(rightArrowImageView, animated: false)
+    }
+
+    private func hideImageNavigationButtons() {
+        previousImageButton.isHidden = true
+        nextImageButton.isHidden = true
+    }
+
+    override func viewDidHide() {
+        super.viewDidHide()
+        hideImageNavigationButtons()
+    }
+
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        updateImageNavigationButtons()
     }
 
     @objc private func jumpBackImages() {
@@ -465,6 +475,7 @@ class LargeImageView: NSView {
         
         let buttonSize = round(60 * scaleFactor)
         let margin = round(30 * scaleFactor)
+        let imageButtonInset: CGFloat = 10
         let cornerRadius = buttonSize / 2
         let borderWidth: CGFloat = max(1, round(scaleFactor))
         // 使用 SymbolConfiguration 控制 SF Symbol 实际渲染尺寸
@@ -481,7 +492,7 @@ class LargeImageView: NSView {
             height: buttonSize
         )
         leftArrowImageView?.frame = leftFrame
-        previousImageButton.frame = leftFrame
+        previousImageButton.frame = leftFrame.offsetBy(dx: imageButtonInset - margin, dy: 0)
         previousImageButton.updateSymbolSize(symbolPointSize)
         leftArrowImageView?.layer?.cornerRadius = cornerRadius
         leftArrowImageView?.layer?.borderWidth = borderWidth
@@ -498,13 +509,14 @@ class LargeImageView: NSView {
             height: buttonSize
         )
         rightArrowImageView?.frame = rightFrame
-        nextImageButton.frame = rightFrame
+        nextImageButton.frame = rightFrame.offsetBy(dx: margin - imageButtonInset, dy: 0)
         nextImageButton.updateSymbolSize(symbolPointSize)
         rightArrowImageView?.layer?.cornerRadius = cornerRadius
         rightArrowImageView?.layer?.borderWidth = borderWidth
         if let rightImage = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Next")?.withSymbolConfiguration(symbolConfig) {
             rightArrowImageView?.image = rightImage
         }
+        updateImageNavigationButtons()
     }
     
     private func showArrowView(_ imageView: NSImageView?, animated: Bool = true) {
@@ -606,11 +618,6 @@ class LargeImageView: NSView {
         // 更新箭头视图位置
         // Update arrow view positions
         updateArrowViewPositions()
-        
-        // 重新设置鼠标跟踪区域
-        // Reset mouse tracking area
-        self.trackingAreas.forEach { self.removeTrackingArea($0) }
-        setupMouseTracking()
     }
     
     /// 仅由播放入口调用，避免读取视图或更新布局时建立音频输出路由、阻塞主线程。
@@ -759,7 +766,6 @@ class LargeImageView: NSView {
         playerItem = nil
         currentPlayingURL = nil
         pausedBySeek = false
-        isVideoMetadataUpdated = false
         removeAllSnapshots()
     }
 
@@ -853,18 +859,11 @@ class LargeImageView: NSView {
                 videoOrderId += 1
                 videoView.isHidden = false
                 pausedBySeek = false
-                isVideoMetadataUpdated = false
                 if !reloadForAB {
                     abPlayPositionA = nil
                     abPlayPositionB = nil
                 }
                 
-                // 读取元信息
-                // Read metadata
-                if viewController.publicVar.isShowExif == true {
-                    updateVideoMetadata(url: url)
-                }
-
                 if let timeRange = getCommonTimeRange(url: url) {
                     playerItem = AVPlayerItem(url: url)
                     if let playerItem = playerItem,
@@ -968,16 +967,6 @@ class LargeImageView: NSView {
             } else {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.01, execute: task)
             }
-        }
-    }
-    
-    func updateVideoMetadata(url: URL?){
-        if !isVideoMetadataUpdated,
-           let url = url,
-           let specificMetadata = getVideoMetadataFormatedFFmpeg(for: url) {
-            let exifData = convertExifData(file: file)
-            updateTextItems(formatExifData(exifData ?? [:], isVideo: true, needWarp: true) + [("-","-")] + specificMetadata)
-            isVideoMetadataUpdated = true
         }
     }
     
@@ -1602,9 +1591,15 @@ class LargeImageView: NSView {
         return NSSize(width: imageView.frame.width * 2, height: imageView.frame.height * 2)
     }
     
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        updateImageNavigationButtons(at: event.locationInWindow)
+    }
+
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
-        
+
+        hideImageNavigationButtons()
         hideArrowView(leftArrowImageView)
         hideArrowView(rightArrowImageView)
         
@@ -1615,7 +1610,8 @@ class LargeImageView: NSView {
     
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
-        
+
+        updateImageNavigationButtons(at: event.locationInWindow)
         if file.type == .video && isVideoViewVisible {
             showVideoControls()
         }
@@ -1814,6 +1810,9 @@ class LargeImageView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         guard let viewController = getViewController(self) else { return }
+        if file.type == .image {
+            updateImageNavigationButtons(at: event.locationInWindow)
+        }
         if isEventInVideoControls(event) { return }
         guard let lastLocation = lastDragLocation else { return }
         if isInOcrState && !viewController.publicVar.isRightMouseDown {return}
@@ -1964,14 +1963,14 @@ class LargeImageView: NSView {
             
             menu.addItem(NSMenuItem.separator())
             
-            var textForExif = NSLocalizedString("Show Exif", comment: "显示Exif信息")
-            if file.type == .video {
-                textForExif = NSLocalizedString("Show Video Metadata", comment: "显示视频元数据")
-            }
-            let actionItemShowExif = menu.addItem(withTitle: textForExif, action: #selector(actShowExif), keyEquivalent: "i")
-            actionItemShowExif.keyEquivalentModifierMask = []
-            actionItemShowExif.state = viewController.publicVar.isShowExif ? .on : .off
-            
+            let inspector = menu.addItem(
+                withTitle: NSLocalizedString("inspector-title", value: "File Inspector", comment: ""),
+                action: #selector(toggleMetadataInspector),
+                keyEquivalent: "i"
+            )
+            inspector.keyEquivalentModifierMask = []
+            inspector.state = viewController.isMetadataInspectorVisible ? .on : .off
+
             if file.type == .image {
                 let actionItemOCR = menu.addItem(withTitle: NSLocalizedString("recognize-OCR", comment: "识别文本"), action: #selector(actOCR), keyEquivalent: "o")
                 actionItemOCR.keyEquivalentModifierMask = []
@@ -2225,18 +2224,8 @@ class LargeImageView: NSView {
         getViewController(self)?.changeLargeImage(firstShowThumb: true, resetSize: true, triggeredByLongPress: false, forceRefresh: true)
     }
 
-    @objc func actShowExif() {
-        guard let viewController = getViewController(self) else { return }
-        viewController.publicVar.isShowExif.toggle()
-        if file.type == .video,
-           viewController.publicVar.isShowExif {
-            updateVideoMetadata(url: URL(string: file.path))
-        }
-        // exifTextView.isHidden = !viewController.publicVar.isShowExif
-    }
-    
-    @objc func actShowVideoMetadata() {
-        getViewController(self)?.handleGetInfo()
+    @objc func toggleMetadataInspector() {
+        getViewController(self)?.toggleMetadataInspector()
     }
 
     @objc func actABPlay() {
@@ -2548,8 +2537,8 @@ private final class ImageNavigationButton: NSButton {
         setAccessibilityLabel(label)
 
         wantsLayer = true
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.65).cgColor
-        layer?.borderColor = NSColor.black.withAlphaComponent(0.15).cgColor
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.30).cgColor
+        layer?.borderColor = NSColor.black.withAlphaComponent(0.08).cgColor
         layer?.borderWidth = 1
     }
 
@@ -2602,240 +2591,6 @@ private final class ImageNavigationButton: NSButton {
         let size = isHovered ? symbolSize * 1.15 : symbolSize
         let configuration = NSImage.SymbolConfiguration(pointSize: size, weight: .regular)
         image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
-    }
-}
-
-// MARK: - ExifTextView
-class ExifTextView: NSView {
-
-    var textItems: [(String, Any)] = [] {
-        didSet {
-            invalidateIntrinsicContentSize()
-            needsDisplay = true
-            updateMapButtonVisibility()
-        }
-    }
-    
-    private var mapButton: NSButton?
-    private var gpsCoordinates: (latitude: Double, longitude: Double, altitude: Double)?
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-
-        guard !textItems.isEmpty else { return }
-
-        let backgroundColor = NSColor.black.withAlphaComponent(0.5)
-        backgroundColor.setFill()
-
-        let padding: CGFloat = 10
-        let rect = NSInsetRect(self.bounds, padding, padding)
-        let path = NSBezierPath(roundedRect: rect, xRadius: 10, yRadius: 10)
-        path.fill()
-
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .natural
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.white,
-            .font: NSFont.systemFont(ofSize: 14),
-            .paragraphStyle: paragraphStyle
-        ]
-
-        let keyAttributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.white,
-            .font: NSFont.boldSystemFont(ofSize: 14),
-            .paragraphStyle: paragraphStyle
-        ]
-
-        var yOffset: CGFloat = rect.origin.y + rect.height - padding
-
-        let keyMaxWidth = textItems.map { $0.0.size(withAttributes: keyAttributes).width }.max() ?? 0
-        let isRTL = userInterfaceLayoutDirection == .rightToLeft
-
-        // 根据keyMaxWidth设置mapButton的左边距
-        // Set mapButton left margin based on keyMaxWidth
-        if let mapButton = mapButton {
-            if let superview = mapButton.superview {
-                mapButton.removeFromSuperview()
-                superview.addSubview(mapButton)
-                mapButton.translatesAutoresizingMaskIntoConstraints = false
-                if isRTL {
-                    NSLayoutConstraint.activate([
-                        mapButton.trailingAnchor.constraint(equalTo: superview.trailingAnchor, constant: -(rect.origin.x + padding)),
-                        mapButton.centerYAnchor.constraint(equalTo: superview.topAnchor, constant: rect.origin.y + rect.height - padding - 8)
-                    ])
-                } else {
-                    NSLayoutConstraint.activate([
-                        mapButton.leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: rect.origin.x + padding + keyMaxWidth + 10),
-                        mapButton.centerYAnchor.constraint(equalTo: superview.topAnchor, constant: rect.origin.y + rect.height - padding - 8)
-                    ])
-                }
-            }
-        }
-
-        for (key, value) in textItems {
-            if key == "-" {
-                // 绘制分割线
-                // Draw separator line
-                let lineRect = NSRect(x: rect.origin.x + padding, y: yOffset - 7, width: rect.width - padding * 2, height: 1)
-                NSColor.white.setFill()
-                lineRect.fill()
-                // 分割线高度 + 间距
-                // Separator line height + spacing
-                yOffset -= 14
-                continue
-            }
-
-            let keyString = NSString(string: key)
-            let valueString = NSString(string: String(describing: value))
-
-            let keySize = keyString.size(withAttributes: keyAttributes)
-            let valueSize = valueString.size(withAttributes: attributes)
-
-            let keyX: CGFloat
-            let valueX: CGFloat
-            if isRTL {
-                keyX = rect.maxX - padding - keySize.width
-                valueX = rect.maxX - padding - keyMaxWidth - 10 - valueSize.width
-            } else {
-                keyX = rect.origin.x + padding
-                valueX = keyX + keyMaxWidth + 10
-            }
-
-            keyString.draw(at: CGPoint(x: keyX, y: yOffset - keySize.height), withAttributes: keyAttributes)
-            valueString.draw(at: CGPoint(x: valueX, y: yOffset - valueSize.height), withAttributes: attributes)
-
-            yOffset -= max(keySize.height, valueSize.height) + 5
-        }
-
-        // 如果有GPS坐标信息,添加一行"Open"
-        // If GPS coordinate information exists, add an "Open" row
-        if gpsCoordinates != nil {
-            let openKey = NSLocalizedString("Location", comment: "位置")
-            let openValue = ""
-
-            let openKeySize = openKey.size(withAttributes: keyAttributes)
-            let openValueSize = openValue.size(withAttributes: attributes)
-
-            let openKeyX: CGFloat
-            let openValueX: CGFloat
-            if isRTL {
-                openKeyX = rect.maxX - padding - openKeySize.width
-                openValueX = rect.maxX - padding - keyMaxWidth - 10 - openValueSize.width
-            } else {
-                openKeyX = rect.origin.x + padding
-                openValueX = openKeyX + keyMaxWidth + 10
-            }
-
-            openKey.draw(at: CGPoint(x: openKeyX, y: yOffset - openKeySize.height), withAttributes: keyAttributes)
-            openValue.draw(at: CGPoint(x: openValueX, y: yOffset - openValueSize.height), withAttributes: attributes)
-            
-            yOffset -= max(openKeySize.height, openValueSize.height) + 5
-        }
-    }
-
-    override var intrinsicContentSize: NSSize {
-        let padding: CGFloat = 10
-        let keyMaxWidth = textItems.map { $0.0.size(withAttributes: [.font: NSFont.boldSystemFont(ofSize: 14)]).width }.max() ?? 0
-        let valueMaxWidth = textItems.map { String(describing: $0.1).size(withAttributes: [.font: NSFont.systemFont(ofSize: 14)]).width }.max() ?? 0
-
-        let lineHeight = "Sample".size(withAttributes: [.font: NSFont.systemFont(ofSize: 14)]).height
-        var numLines = CGFloat(textItems.count) + 1
-        var additionalHeight: CGFloat = 0
-        
-        for (key, _) in textItems {
-            if key == "-" {
-                // 分割线高度 + 间距
-                // Separator line height + spacing
-                additionalHeight += 15
-                // 分割线不算在内
-                // Separator line doesn't count
-                numLines -= 1
-            }
-        }
-        
-        // 如果有GPS坐标信息，为按钮预留额外空间
-        // If GPS coordinate information exists, reserve extra space for button
-        if gpsCoordinates != nil {
-            additionalHeight += 20
-        }
-
-        let height = numLines * lineHeight + (numLines - 1) * 5 + padding * 2 + additionalHeight
-        let width = keyMaxWidth + valueMaxWidth + 35 + padding * 2
-
-        return NSSize(width: width, height: height)
-    }
-    
-    private func updateMapButtonVisibility() {
-        // 检查是否有GPS坐标信息
-        // Check if GPS coordinate information exists
-        var latitude: Double?
-        var longitude: Double?
-        var altitude: Double?
-        
-        for (key, value) in textItems {
-            if key == NSLocalizedString("Exif-GPSLatitude", comment: "GPS纬度") {
-                if let latString = value as? String {
-                    // 提取数字部分，去掉"°"符号
-                    // Extract numeric part, remove "°" symbol
-                    let cleanString = latString.replacingOccurrences(of: "°", with: "")
-                    latitude = Double(cleanString)
-                }
-            } else if key == NSLocalizedString("Exif-GPSLongitude", comment: "GPS经度") {
-                if let lonString = value as? String {
-                    // 提取数字部分，去掉"°"符号
-                    // Extract numeric part, remove "°" symbol
-                    let cleanString = lonString.replacingOccurrences(of: "°", with: "")
-                    longitude = Double(cleanString)
-                }
-            } else if key == NSLocalizedString("Exif-GPSAltitude", comment: "GPS海拔") {
-                if let altString = value as? String {
-                    // 提取数字部分，去掉"m"符号
-                    // Extract numeric part, remove "m" symbol
-                    let cleanString = altString.replacingOccurrences(of: "m", with: "")
-                    altitude = Double(cleanString)
-                }
-            }
-        }
-        
-        if latitude != nil || longitude != nil || altitude != nil {
-            gpsCoordinates = (
-                latitude: latitude ?? 0,
-                longitude: longitude ?? 0,
-                altitude: altitude ?? 0
-            )
-            createMapButton()
-        } else {
-            gpsCoordinates = nil
-            removeMapButton()
-        }
-    }
-    
-    private func createMapButton() {
-        guard mapButton == nil else { return }
-        
-        mapButton = NSButton(title: NSLocalizedString("Open in Map", comment: "在地图中打开"), target: self, action: #selector(openInMap))
-        mapButton?.bezelStyle = .rounded
-        mapButton?.font = NSFont.systemFont(ofSize: 12)
-        
-        addSubview(mapButton!)
-    }
-    
-    private func removeMapButton() {
-        mapButton?.removeFromSuperview()
-        mapButton = nil
-    }
-    
-    @objc private func openInMap() {
-        guard let coordinates = gpsCoordinates else { return }
-        
-        // 构建地图URL，使用Apple Maps
-        // Build map URL, using Apple Maps
-        let mapURLString = "http://maps.apple.com/?q=\(coordinates.latitude),\(coordinates.longitude)"
-        
-        if let mapURL = URL(string: mapURLString) {
-            NSWorkspace.shared.open(mapURL)
-        }
     }
 }
 

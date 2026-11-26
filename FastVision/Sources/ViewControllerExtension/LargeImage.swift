@@ -187,7 +187,6 @@ extension ViewController {
             }
         }
 
-        largeImageView.updateTextItems([])
         setWindowTitle()
     }
     
@@ -750,6 +749,7 @@ extension ViewController {
             getFileInfo(file: file)
             file.imageInfo = getImageInfo(url: url, needMetadata: true)
             file.originalSize=file.imageInfo?.size
+            requestMetadataInspectorUpdate(force: true)
         }
         
         let scale = NSScreen.main?.backingScaleFactor ?? 1
@@ -915,13 +915,6 @@ extension ViewController {
                let window = windowController.window,
                !window.isVisible {
                 windowController.showWindow(nil)
-            }
-            
-            // 加载Exif
-            // Load Exif
-            if publicVar.isShowExif && resetSize {
-                let exifData = convertExifData(file: file)
-                largeImageView.updateTextItems(formatExifData(exifData ?? [:], isVideo: globalVar.HandledVideoExtensions.contains(url.pathExtension.lowercased()), needWarp: true))
             }
             
             // 用来对比异步任务是否过期

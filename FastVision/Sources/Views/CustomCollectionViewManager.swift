@@ -10,87 +10,83 @@ class CustomCollectionViewManager: NSObject, NSCollectionViewDataSource, NSColle
     
     var fileDB: DatabaseModel
     var lastSelectedIndexPath: IndexPath?
+    private var files: [FileModel] = []
+    private(set) var presentedItemCount = 0
     
     init(fileDB: DatabaseModel) {
         self.fileDB = fileDB
     }
     
+    func replaceFiles(_ files: [FileModel]) {
+        self.files = files
+        presentedItemCount = 0
+        lastSelectedIndexPath = nil
+    }
+
+    func presentItems(upTo count: Int) {
+        presentedItemCount = min(count, files.count)
+    }
+
+    func file(at indexPath: IndexPath) -> FileModel? {
+        guard indexPath.section == 0, (0..<presentedItemCount).contains(indexPath.item) else { return nil }
+        return files[indexPath.item]
+    }
+
     func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int {
-        fileDB.lock()
-        defer{fileDB.unlock()}
-        if let db=fileDB.db[SortKeyDir(fileDB.curFolder)] {
-            return min(db.layoutCalcPos,db.files.count)
-        }
-        return 0
+        section == 0 ? presentedItemCount : 0
     }
     
     func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
         let item = collectionView.makeItem(withIdentifier: NSUserInterfaceItemIdentifier(rawValue: "CustomCollectionViewItem"), for: indexPath) as! CustomCollectionViewItem
 
-        fileDB.lock()
-        if let file=fileDB.db[SortKeyDir(fileDB.curFolder)]?.files.elementSafe(atOffset: indexPath.item)?.1{
+        let thumbnailView = item.view as! ThumbnailItemView
+        if let file = file(at: indexPath), let collectionView = collectionView as? CustomCollectionView {
+            thumbnailView.presentationGeneration = collectionView.thumbnailGeneration
+            fileDB.lock()
             item.configureWithImage(file)
-            item.view.isHidden = false
+            fileDB.unlock()
+            thumbnailView.isHidden = false
         } else {
-            item.view.isHidden = true
+            thumbnailView.retire()
         }
-        fileDB.unlock()
         
         return item
     }
     
+    func collectionView(_ collectionView: NSCollectionView, willDisplay item: NSCollectionViewItem, forRepresentedObjectAt indexPath: IndexPath) {
+        guard let collectionView = collectionView as? CustomCollectionView,
+              let item = item as? CustomCollectionViewItem,
+              let thumbnailView = item.view as? ThumbnailItemView,
+              thumbnailView.presentationGeneration == collectionView.thumbnailGeneration,
+              item.file === file(at: indexPath) else { return }
+        thumbnailView.isHidden = false
+    }
+
     func collectionView(_ collectionView: NSCollectionView, didEndDisplaying item: NSCollectionViewItem, forRepresentedObjectAt indexPath: IndexPath) {
-//        (item as! ImageCollectionViewItem).imageViewObj?.image?.recache()
-//        (item as! ImageCollectionViewItem).imageViewObj?.image=nil
+        if collectionView.indexPath(for: item) == nil {
+            (item.view as? ThumbnailItemView)?.hideThumbnail()
+        }
     }
     
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
-        // guard let viewController = getViewController(collectionView) else { return }
-        // for indexPath in indexPaths{
-            // 注意：下面这句当item不在视野内时为nil
-            // Note: The following statement is nil when item is not in view
-            // let item = collectionView.item(at: indexPath) as? ImageCollectionViewItem
-//            fileDB.lock()
-//            if let file=fileDB.db[SortKeyDir(fileDB.curFolder)]?.files.elementSafe(atOffset: indexPath.item)?.1{
-//                log("Select:",String(indexPath.item),file.path)
-//                viewController.publicVar.selectedUrls2.append(URL(string: file.path)!)
-//            }
-//            fileDB.unlock()
-        // }
-        // log("Selected numbers:"+String(indexPaths.count))
+        getViewController(collectionView)?.requestMetadataInspectorUpdate()
     }
-    
+
     func collectionView(_ collectionView: NSCollectionView, didDeselectItemsAt indexPaths: Set<IndexPath>) {
-        // guard let viewController = getViewController(collectionView) else { return }
-        // for indexPath in indexPaths {
-            // 注意：下面这句当item不在视野内时为nil
-            // Note: The following statement is nil when item is not in view
-            // let item = collectionView.item(at: indexPath) as? ImageCollectionViewItem
-//            fileDB.lock()
-//            if let file=fileDB.db[SortKeyDir(fileDB.curFolder)]?.files.elementSafe(atOffset: indexPath.item)?.1{
-//                log("Deselect:",String(indexPath.item),file.path)
-//                if let index=viewController.publicVar.selectedUrls2.firstIndex(of: URL(string: file.path)!){
-//                    viewController.publicVar.selectedUrls2.remove(at: index)
-//                }
-//            }
-//            fileDB.unlock()
-        // }
-        // log("Deselected numbers:"+String(indexPaths.count))
+        getViewController(collectionView)?.requestMetadataInspectorUpdate()
     }
+
     func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> NSSize {
         fileDB.lock()
         defer{fileDB.unlock()}
-        if let thumbSize=fileDB.db[SortKeyDir(fileDB.curFolder)]?.files.elementSafe(atOffset: indexPath.item)?.1.thumbSize{
-            return thumbSize
-        }
-        return DEFAULT_SIZE
+        return file(at: indexPath)?.thumbSize ?? DEFAULT_SIZE
     }
     
     func collectionView(_ collectionView: NSCollectionView, pasteboardWriterForItemAt indexPath: IndexPath) -> NSPasteboardWriting? {
         fileDB.lock()
         defer{fileDB.unlock()}
         let pasteboardItem = NSPasteboardItem()
-        if let path = fileDB.db[SortKeyDir(fileDB.curFolder)]?.files.elementSafe(atOffset: indexPath.item)?.1.path,
+        if let path = file(at: indexPath)?.path,
            let url = URL(string: path){
             pasteboardItem.setString(url.absoluteString, forType: .fileURL)
         }

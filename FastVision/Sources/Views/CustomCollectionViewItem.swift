@@ -7,6 +7,32 @@ import Cocoa
 import AVKit
 import AVFoundation
 
+final class ThumbnailItemView: NSView {
+    weak var item: CustomCollectionViewItem?
+    var presentationGeneration: UInt?
+
+    func hideThumbnail() {
+        isHidden = true
+        item?.stopVideo()
+        item?.imageViewObj.layer?.removeAnimation(forKey: kCATransition)
+    }
+
+    func retire() {
+        presentationGeneration = nil
+        hideThumbnail()
+        item?.imageViewObj.image = nil
+        item?.imageNameField.stringValue = ""
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let changed = frame.size != newSize
+        super.setFrameSize(newSize)
+        if changed, presentationGeneration != nil {
+            item?.setCustomFrameSize()
+        }
+    }
+}
+
 class CustomCollectionViewItem: NSCollectionViewItem {
     
     @IBOutlet weak var imageViewObj: CustomThumbImageView!
@@ -41,6 +67,7 @@ class CustomCollectionViewItem: NSCollectionViewItem {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        (view as? ThumbnailItemView)?.item = self
         // Do view setup here.
 
         view.wantsLayer = true
@@ -289,6 +316,7 @@ class CustomCollectionViewItem: NSCollectionViewItem {
     
     override func prepareForReuse() {
         super.prepareForReuse()
+        (view as? ThumbnailItemView)?.retire()
         previewTimeRange = nil
         finderTagDotsView?.removeFromSuperview()
         finderTagDotsView = nil
@@ -413,6 +441,9 @@ class CustomCollectionViewItem: NSCollectionViewItem {
     func configureWithImage(_ fileModel: FileModel, playAnimation: Bool = false) {
         guard let viewController = getViewController(collectionView) else { return }
 
+        if !playAnimation || self.file !== fileModel {
+            imageViewObj.layer?.removeAnimation(forKey: kCATransition)
+        }
         stopVideo()
         
         self.file=fileModel
@@ -553,6 +584,8 @@ class CustomCollectionViewItem: NSCollectionViewItem {
     }
     
     func updateCutDimEffect() {
+        let displayedFile = file
+        let generation = (view as? ThumbnailItemView)?.presentationGeneration
         let isCut = globalVar.cutItemPaths.contains(file.path)
         let targetAlpha: CGFloat
         if isCut {
@@ -565,7 +598,10 @@ class CustomCollectionViewItem: NSCollectionViewItem {
         // 由于布局过程中alpha值可能会被重置，需要等待布局完成后再设置
         // Since the alpha value may be reset during layout, it needs to be set after layout is complete
         DispatchQueue.main.async { [weak self] in
-            self?.view.alphaValue = targetAlpha
+            guard let self, self.file === displayedFile,
+                  let thumbnailView = self.view as? ThumbnailItemView,
+                  thumbnailView.presentationGeneration == generation else { return }
+            thumbnailView.alphaValue = targetAlpha
         }
     }
     

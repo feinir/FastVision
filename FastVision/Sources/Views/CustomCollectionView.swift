@@ -9,6 +9,49 @@ import Cocoa
 class CustomCollectionView: NSCollectionView {
 
     private var mouseDownLocation: NSPoint? = nil
+    private(set) var thumbnailGeneration: UInt = 0
+
+    override var selectionIndexPaths: Set<IndexPath> {
+        didSet {
+            if selectionIndexPaths != oldValue {
+                getViewController(self)?.requestMetadataInspectorUpdate()
+            }
+        }
+    }
+
+    override func reloadData() {
+        thumbnailGeneration &+= 1
+        forEachThumbnailView(in: self) { $0.retire() }
+        super.reloadData()
+    }
+
+    override func layout() {
+        super.layout()
+        guard let manager = dataSource as? CustomCollectionViewManager else { return }
+        forEachThumbnailView(in: self) { thumbnailView in
+            guard !thumbnailView.isHidden else { return }
+            // A cell can remain mounted after AppKit stops reporting it as a visible item.
+            guard thumbnailView.presentationGeneration == thumbnailGeneration,
+                  let item = thumbnailView.item,
+                  item.view === thumbnailView,
+                  let indexPath = indexPath(for: item),
+                  self.item(at: indexPath) === item,
+                  manager.file(at: indexPath) === item.file else {
+                thumbnailView.hideThumbnail()
+                return
+            }
+        }
+    }
+
+    private func forEachThumbnailView(in parent: NSView, _ body: (ThumbnailItemView) -> Void) {
+        for subview in parent.subviews {
+            if let thumbnailView = subview as? ThumbnailItemView {
+                body(thumbnailView)
+            } else {
+                forEachThumbnailView(in: subview, body)
+            }
+        }
+    }
     
     private lazy var folderInfoLabel: NSTextField = {
         let label = NSTextField(labelWithString: "")

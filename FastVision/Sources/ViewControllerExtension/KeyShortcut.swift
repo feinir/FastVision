@@ -667,7 +667,7 @@ extension ViewController {
             // Check if key is "I"
             if characters == "i" && noModifierKey {
                 if publicVar.isInLargeView{
-                    largeImageView.actShowExif()
+                    toggleMetadataInspector()
                     return nil
                 }else{
                     if publicVar.isOutlineViewFirstResponder{

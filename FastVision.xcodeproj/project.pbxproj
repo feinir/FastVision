@@ -91,6 +91,7 @@
 		F7F600482E1E095500ED8536 /* FinderTag.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7F600472E1E094A00ED8536 /* FinderTag.swift */; };
 		F7FAE0012F6BA00000FAE001 /* FavoritesPopoverViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FAE0002F6BA00000FAE000 /* FavoritesPopoverViewController.swift */; };
 		F7FAE1012F6BA00000FAE101 /* FileInfoWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FAE1002F6BA00000FAE100 /* FileInfoWindow.swift */; };
+		F7FAE3012F6BA00000FAE301 /* MetadataInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FAE3002F6BA00000FAE300 /* MetadataInspector.swift */; };
 		F7AC19007F90190000000006 /* SimilarPhotosViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000005 /* SimilarPhotosViewController.swift */; };
 		F7AC19007F90190000000010 /* PhotoCropWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7AC19007F90190000000009 /* PhotoCropWindowController.swift */; };
 		F7FED5F32F7D0B1100E35164 /* Tagging.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FED5F22F7D0B0E00E35164 /* Tagging.swift */; };
@@ -221,6 +222,7 @@
 		F7F600472E1E094A00ED8536 /* FinderTag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderTag.swift; sourceTree = "<group>"; };
 		F7FAE0002F6BA00000FAE000 /* FavoritesPopoverViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesPopoverViewController.swift; sourceTree = "<group>"; };
 		F7FAE1002F6BA00000FAE100 /* FileInfoWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileInfoWindow.swift; sourceTree = "<group>"; };
+		F7FAE3002F6BA00000FAE300 /* MetadataInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataInspector.swift; sourceTree = "<group>"; };
 		F7AC19007F90190000000005 /* SimilarPhotosViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarPhotosViewController.swift; sourceTree = "<group>"; };
 		F7AC19007F90190000000009 /* PhotoCropWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCropWindowController.swift; sourceTree = "<group>"; };
 		F7FED5F22F7D0B0E00E35164 /* Tagging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tagging.swift; sourceTree = "<group>"; };
@@ -282,6 +284,7 @@
 				F73865E52C37C1AA00837FE4 /* DrawingView.swift */,
 				F7FAE0002F6BA00000FAE000 /* FavoritesPopoverViewController.swift */,
 				F7FAE1002F6BA00000FAE100 /* FileInfoWindow.swift */,
+				F7FAE3002F6BA00000FAE300 /* MetadataInspector.swift */,
 				F7AC19007F90190000000005 /* SimilarPhotosViewController.swift */,
 				F7AC19007F90190000000009 /* PhotoCropWindowController.swift */,
 				F7AC19007F90190000000015 /* PhotoAnnotationOptions.swift */,
@@ -565,6 +568,7 @@
 				F70F9FC32BAFE85D00C50CDD /* CustomCollectionViewManager.swift in Sources */,
 				F7FAE0012F6BA00000FAE001 /* FavoritesPopoverViewController.swift in Sources */,
 				F7FAE1012F6BA00000FAE101 /* FileInfoWindow.swift in Sources */,
+				F7FAE3012F6BA00000FAE301 /* MetadataInspector.swift in Sources */,
 				F7AC19007F90190000000006 /* SimilarPhotosViewController.swift in Sources */,
 				F7AC19007F90190000000010 /* PhotoCropWindowController.swift in Sources */,
 				F7A075542BA1D716009C47A6 /* AppDelegate.swift in Sources */,
@@ -840,7 +844,7 @@
 				CODE_SIGN_ENTITLEMENTS = FastVision/FastVision.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20261126.1;
+				CURRENT_PROJECT_VERSION = 20261126.3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = FastVision/Info.plist;
@@ -855,7 +859,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 2.0.2;
+				MARKETING_VERSION = 2.0.3;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision.debug;
 				PRODUCT_MODULE_NAME = FastVision;
@@ -874,7 +878,7 @@
 				CODE_SIGN_ENTITLEMENTS = FastVision/FastVision.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 20261126.1;
+				CURRENT_PROJECT_VERSION = 20261126.3;
 
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -890,7 +894,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 2.0.2;
+				MARKETING_VERSION = 2.0.3;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision;
 				PRODUCT_MODULE_NAME = FastVision;
@@ -923,7 +927,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 2.0.2;
+				MARKETING_VERSION = 2.0.3;
 				MERGED_BINARY_TYPE = automatic;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ynpe.fastvision;
 				PRODUCT_MODULE_NAME = FastVision;
